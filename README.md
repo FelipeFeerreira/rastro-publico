@@ -1,0 +1,203 @@
+# Rastro Público
+
+**Para onde vai o dinheiro público?**
+
+Plataforma independente, apartidária e de código aberto para **pesquisar, entender e
+investigar** os gastos públicos brasileiros. Combina busca em linguagem natural,
+dashboards de contratações, comparação de preços e um motor de auditoria determinístico
+que sinaliza possíveis anomalias para **verificação humana** — nunca como prova de
+irregularidade.
+
+> ⚠️ O Rastro Público **não é um serviço oficial do governo**. Todos os dados são
+> provenientes de fontes públicas oficiais e preservam o vínculo com o registro
+> original.
+
+---
+
+## Sumário
+
+- [Visão geral](#visão-geral)
+- [Arquitetura](#arquitetura)
+- [Stack](#stack)
+- [Início rápido com Docker](#início-rápido-com-docker)
+- [Desenvolvimento local](#desenvolvimento-local)
+- [Ingestão de dados reais](#ingestão-de-dados-reais)
+- [Testes](#testes)
+- [Estrutura do projeto](#estrutura-do-projeto)
+- [Princípios](#princípios)
+- [Documentação](#documentação)
+
+---
+
+## Visão geral
+
+O Rastro Público oferece duas experiências integradas:
+
+1. **Busca simples** — qualquer cidadão pesquisa gastos, contratos, fornecedores, órgãos
+   e itens usando linguagem natural, com autocomplete, filtros e agrupamento de
+   resultados.
+2. **Investigação automatizada** — o sistema compara preços de contratações equivalentes,
+   detecta anomalias estatísticas de forma explicável e organiza evidências para
+   relatórios cidadãos.
+
+A primeira integração real é o **Portal Nacional de Contratações Públicas (PNCP)**,
+cobrindo contratações sob a Lei 14.133/2021 de União, estados e municípios.
+
+## Arquitetura
+
+Monólito modular com fronteiras claras:
+
+```
+frontend/  Next.js (App Router, TypeScript, Tailwind, shadcn/ui, Recharts)
+backend/   FastAPI + SQLAlchemy + Alembic + Pydantic
+  ├── connectors/   conectores de dados públicos (PNCP, ...)
+  ├── services/     ingestão, normalização, busca, análise, IA, relatórios
+  ├── models/       schema PostgreSQL normalizado
+  └── api/          endpoints REST versionados
+postgres/  banco relacional com full-text search
+redis/     cache de rate-limit e tarefas assíncronas (opcional)
+```
+
+Detalhes em [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+
+## Stack
+
+| Camada     | Tecnologia |
+|------------|------------|
+| Frontend   | Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Lucide, Recharts |
+| Backend    | Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2 |
+| Banco      | PostgreSQL 16 (full-text search com `portuguese`) |
+| Async      | Redis + Celery (opcional) |
+| Infra      | Docker, Docker Compose, GitHub Actions |
+| Testes     | pytest, respx, Vitest, Testing Library, Playwright |
+
+## Início rápido com Docker
+
+```bash
+cp .env.example .env
+# edite .env se necessário (portas, segredos)
+docker compose up -d --build
+```
+
+- Frontend: http://localhost:3000
+- API: http://localhost:8000/api/v1
+- Documentação da API (Swagger): http://localhost:8000/api/docs
+
+Sincronize uma pequena amostra de dados reais do PNCP:
+
+```bash
+docker compose exec api python -m app.cli seed
+docker compose exec api python -m app.cli ingest pncp \
+  --data-inicial 2026-01-05 --data-final 2026-01-05 \
+  --modalidades 6 --max-paginas 1
+```
+
+## Desenvolvimento local
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+alembic upgrade head
+python -m app.cli seed
+uvicorn app.main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend
+cp .env.example .env.local   # ajuste NEXT_PUBLIC_API_BASE_URL
+npm install
+npm run dev
+```
+
+## Ingestão de dados reais
+
+O conector do PNCP implementa paginação, rate limiting, retries com backoff
+exponencial e deduplicação por número de controle PNCP.
+
+```bash
+# Contratações por período e modalidade (códigos da Lei 14.133/2021)
+python -m app.cli ingest pncp --data-inicial 2026-01-01 --data-final 2026-01-31 \
+  --uf SP --modalidades 6,5 --max-paginas 5
+
+# Incluir itens e resultados homologados (mais lento na fonte)
+python -m app.cli ingest pncp --data-inicial 2026-01-05 --data-final 2026-01-05 \
+  --com-itens --max-paginas 1
+
+# Contratos
+python -m app.cli contracts --data-inicial 2026-01-01 --data-final 2026-01-31
+
+# Executar motor de auditoria
+python -m app.cli audit --limit 200
+```
+
+> A coleta é **incremental**: registros já existentes são atualizados, não duplicados.
+> Cada execução gera um `collection_run` com contadores e log de erros.
+
+## Testes
+
+```bash
+# Backend
+cd backend && python -m pytest -q        # 37 testes
+ruff check app tests
+
+# Frontend
+cd frontend && npm run test              # Vitest
+npm run typecheck && npm run lint
+npm run test:e2e                         # Playwright (requer a stack no ar)
+```
+
+## Estrutura do projeto
+
+```
+politica/
+├── ARCHITECTURE.md          # decisões arquiteturais e modelo de dados
+├── ROADMAP.md               # marcos e status
+├── docker-compose.yml
+├── .env.example
+├── backend/
+│   ├── app/
+│   │   ├── core/            # config, logging, segurança, rate limit
+│   │   ├── db/              # engine, sessão, base declarativa
+│   │   ├── models/          # 26 tabelas normalizadas
+│   │   ├── schemas/         # contratos Pydantic
+│   │   ├── connectors/      # PNCP e infraestrutura de conectores
+│   │   ├── services/        # ingestão, normalização, busca, análise, IA
+│   │   ├── api/v1/          # endpoints REST
+│   │   ├── cli.py           # seed, ingest, audit, stats
+│   │   └── main.py
+│   ├── alembic/             # migrações
+│   └── tests/               # pytest
+└── frontend/
+    └── src/
+        ├── app/             # rotas (App Router)
+        ├── components/      # UI, layout, busca, gráficos, investigação
+        └── lib/             # api, tipos, formatação
+```
+
+## Princípios
+
+1. **Nunca inventar dados.** Valores de produção vêm exclusivamente de fontes oficiais.
+2. **Rastreabilidade total.** Todo número aponta para o registro e a fonte originais.
+3. **Estágios financeiros distintos.** Estimado ≠ homologado ≠ empenhado ≠ pago.
+4. **Anomalia não é acusação.** A plataforma sinaliza; quem conclui são os órgãos
+   competentes e o cidadão.
+5. **A IA não calcula valores.** Cálculo é determinístico; a IA explica e organiza.
+6. **Neutralidade política.** Nenhum ranking de corrupção ou veredito automático.
+
+## Documentação
+
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — arquitetura, modelo de dados e conector PNCP
+- [`ROADMAP.md`](./ROADMAP.md) — marcos e checklist
+- [`docs/API.md`](./docs/API.md) — referência da API
+- [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) — implantação e operação
+- [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md) — fontes e requisitos
+
+## Licença e uso responsável
+
+Plataforma de interesse público. Ao reutilizar os dados, cite a fonte oficial e o
+Rastro Público. Não apresente achados automáticos como prova de irregularidade.

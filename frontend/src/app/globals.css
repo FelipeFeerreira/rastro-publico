@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 99%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --primary: 199 89% 30%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 42%;
+
+    --accent: 174 62% 40%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 152 60% 36%;
+    --success-foreground: 210 40% 98%;
+
+    --warning: 32 95% 44%;
+    --warning-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 199 89% 30%;
+
+    --radius: 0.65rem;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 44% 10%;
+    --card-foreground: 210 40% 96%;
+
+    --primary: 199 80% 55%;
+    --primary-foreground: 222 47% 9%;
+
+    --secondary: 217 33% 16%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 174 62% 45%;
+    --accent-foreground: 222 47% 9%;
+
+    --destructive: 0 62% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --success: 152 55% 45%;
+    --success-foreground: 222 47% 9%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 222 47% 9%;
+
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 199 80% 55%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    @apply bg-primary/20;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  .prose-rp {
+    @apply text-[15px] leading-relaxed text-muted-foreground;
+  }
+  .prose-rp h2 {
+    @apply mt-8 text-lg font-semibold text-foreground;
+  }
+  .prose-rp h3 {
+    @apply mt-6 font-semibold text-foreground;
+  }
+  .prose-rp p {
+    @apply mt-3;
+  }
+  .prose-rp ul {
+    @apply mt-3 list-disc space-y-1 pl-5;
+  }
+  .prose-rp a {
+    @apply text-primary underline underline-offset-4 hover:opacity-80;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
