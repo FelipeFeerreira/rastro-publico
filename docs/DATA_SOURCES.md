@@ -128,6 +128,59 @@ proveniências separadas em vez de sobrescrever registros.
 
 ---
 
+## 6. Execução financeira — Comprasnet (empenhado / liquidado / pago) ✅ integrado
+
+- **Rotas** (sem autenticação):
+  - `GET /api/contrato/{id}/empenhos` → empenhos com `empenhado`, `liquidado`, `pago`, `rp*`.
+  - `GET /api/contrato/{id}/faturas` → faturas/notas (só as liquidadas entram como pagamento).
+- **Proveniência:** cada lançamento guarda `source_system`, `external_id`
+  (`empenho:{id}:{estágio}` / `fatura:{id}`), URL de origem e data de coleta.
+- **Estágios separados:** “empenhado” reserva, “liquidado” confere, “pago” efetiva.
+  Valor contratado **nunca** é exibido como pago.
+
+### Piloto verificado: IFSP Campus Salto (UASG 158364)
+
+```bash
+python -m app.cli comprasnet-pagamentos --uasg 158364
+```
+
+Resultado real (2026-10-11): **1.776 lançamentos** em 249 contratos, 0 erros.
+Empenhado R$ 14.700.551,70 · Liquidado R$ 8.292.995,45 · Pago R$ 8.212.820,59.
+
+Verificação:
+
+```bash
+curl "http://localhost:8000/api/v1/pagamentos?uasg=158364"
+curl "http://localhost:8000/api/v1/contratos/{id}"        # payment_summary por estágio
+```
+
+---
+
+## 7. Remuneração de servidores — investigada, **bloqueada** (sem chave/acesso)
+
+Prioridade: IFSP Campus Salto (federal, UASG 158364) e Prefeitura de Salto/SP
+(municipal, IBGE 3545209). **Nenhum registro de salário foi importado** — os dados
+oficiais não estavam acessíveis neste ambiente. Não foram usados dados estimados.
+
+| Fonte | Situação | Motivo verificado |
+|-------|----------|-------------------|
+| Portal da Transparência (API federal) | **credencial ausente** | Requer `TRANSPARENCIA_API_KEY`; sem ela retorna HTTP 401. OpenAPI: `https://api.portaldatransparencia.gov.br/v3/api-docs` |
+| Dados Abertos do IFSP (CKAN) | **bloqueado (WAF)** | `https://dados.ifsp.edu.br/api/3/action/...` respondeu HTTP 202 vazio |
+| Prefeitura de Salto — Remuneração (Prescon/APEX) | **indisponível** | `saltotransparencia.presconinformatica.com.br:8443` inacessível (porta bloqueada) |
+
+Quando a credencial estiver disponível, o comando (já implementado) importa servidores
+**verificando o campus pela UORG de lotação** (não atribui todo o IFSP ao campus Salto):
+
+```bash
+export TRANSPARENCIA_API_KEY="sua-chave"
+python -m app.cli transparencia-servidores --orgao 26439 --mes 202501 \
+  --campus "IFSP - CAMPUS SALTO"
+```
+
+Estado exposto pela API: `GET /api/v1/salarios/fontes`.
+
+---
+
 ## Diretrizes de coleta
 
 1. **Verificar antes de implementar.** Confirmar documentação, autenticação, schema,

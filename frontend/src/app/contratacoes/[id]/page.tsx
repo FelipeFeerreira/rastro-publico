@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, MapPin, Scale } from "lucide-react";
+import { Building2, CalendarDays, Coins, ExternalLink, MapPin, Scale } from "lucide-react";
 
 import { DataNotice, ErrorState, SectionHeading } from "@/components/common";
 import { PriceBars } from "@/components/charts/price-bars";
 import { AddToInvestigation } from "@/components/investigation/add-to-investigation";
+import { AnswerGrid } from "@/components/plain-summary";
 import { ItemComparison } from "@/components/investigation/item-comparison";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,42 @@ export default async function ProcurementDetailPage({
               </a>
             </Button>
           )}
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-lg border border-primary/20 bg-primary/5 p-5">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          O que foi comprado ou contratado?
+        </p>
+        <p className="mt-1 text-sm font-medium">{procurement.object_description}</p>
+        <div className="mt-4">
+          <AnswerGrid
+            items={[
+              {
+                icon: Building2,
+                question: "Quem contratou?",
+                answer: procurement.entity?.name ?? "Não informado",
+              },
+              {
+                icon: MapPin,
+                question: "Onde?",
+                answer: procurement.municipality
+                  ? `${procurement.municipality.name}${procurement.municipality.uf ? `/${procurement.municipality.uf}` : ""}`
+                  : "Não informado",
+              },
+              {
+                icon: CalendarDays,
+                question: "Quando?",
+                answer: formatDate(procurement.published_at),
+              },
+              {
+                icon: Coins,
+                question: "Quanto custou?",
+                answer: formatCurrency(procurement.estimated_total),
+                hint: `Homologado: ${formatCurrency(procurement.approved_total)}`,
+              },
+            ]}
+          />
         </div>
       </div>
 

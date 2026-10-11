@@ -134,6 +134,17 @@ toleradas (`begin_nested`) sem interromper a execução completa.
 Isso mantém despesas **federais** (IFSP) separadas das **municipais**, filtráveis por
 `uasg`, `source_system` e `organization_code` em `/contratos`.
 
+### Execução financeira e remuneração
+
+- **Pagamentos:** `GET /api/contrato/{id}/empenhos` e `/faturas` alimentam a tabela
+  `payments` com um lançamento por estágio (`empenhado`, `liquidado`, `pago`),
+  idempotente por `(contract_id, external_id)`. Valor contratado e valor pago são
+  campos e somas distintos.
+- **Remuneração:** `connectors/transparencia.py` consulta o Portal da Transparência
+  (header `chave-api-dados`, obrigatório). A lotação (campus/UORG) é resolvida no
+  detalhe do servidor; o código do órgão não identifica o campus. Sem a chave, o
+  serviço registra a ausência de credencial e não importa nada.
+
 ## 5. Motor de análise
 
 ### Preço unitário

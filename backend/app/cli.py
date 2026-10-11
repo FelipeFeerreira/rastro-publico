@@ -17,7 +17,7 @@ from sqlalchemy import func, select
 from app.core.logging import configure_logging
 from app.db.session import session_scope
 from app.models.audit import AuditFinding
-from app.models.procurement import Contract, Procurement, ProcurementResult
+from app.models.procurement import Contract, Payment, Procurement, ProcurementResult
 from app.models.supplier import Supplier
 from app.services.analysis.engine import AuditEngine, ensure_rules
 from app.services.ingestion import IngestionService
@@ -90,6 +90,37 @@ def cmd_comprasnet(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_comprasnet_pagamentos(args: argparse.Namespace) -> None:
+    with session_scope() as db:
+        run = IngestionService(db).ingest_comprasnet_payments(
+            args.uasg,
+            include_invoices=not args.sem_faturas,
+            max_contracts=args.max,
+        )
+    print(
+        f"Execução #{run.id} [{run.status.value}] UASG {args.uasg} "
+        f"contratos={run.records_fetched} lançamentos+={run.records_inserted} "
+        f"atualizados={run.records_updated} erros={run.error_count}"
+    )
+
+
+def cmd_servidores(args: argparse.Namespace) -> None:
+    with session_scope() as db:
+        run = IngestionService(db).ingest_transparencia_servidores(
+            args.orgao,
+            args.mes,
+            campus_uorg=args.campus,
+            max_servidores=args.max,
+        )
+    print(
+        f"Execução #{run.id} [{run.status.value}] órgão {args.orgao} mês {args.mes} "
+        f"servidores={run.records_fetched} inseridos={run.records_inserted} "
+        f"atualizados={run.records_updated} erros={run.error_count}"
+    )
+    if run.error_count:
+        print("Observação:", run.message)
+
+
 def cmd_audit(args: argparse.Namespace) -> None:
     with session_scope() as db:
         created = AuditEngine(db).run_scan(limit=args.limit)
@@ -114,6 +145,7 @@ def cmd_stats(_: argparse.Namespace) -> None:
         print(f"  Resultados de item:    {count(ProcurementResult)}")
         print(f"  Contratos:             {count(Contract)}")
         print(f"  Contratos (Comprasnet):{comprasnet_contracts}")
+        print(f"  Pagamentos (estágios): {count(Payment)}")
         print(f"  Fornecedores:          {count(Supplier)}")
         print(f"  Achados:               {count(AuditFinding)}")
 
@@ -155,6 +187,25 @@ def build_parser() -> argparse.ArgumentParser:
     comprasnet.add_argument("--uf", help="UF da unidade (ex.: SP)")
     comprasnet.add_argument("--max", type=int, default=None, help="Limite de contratos processados")
     comprasnet.set_defaults(func=cmd_comprasnet)
+
+    pagamentos = sub.add_parser(
+        "comprasnet-pagamentos",
+        help="Importa empenhos (empenhado/liquidado/pago) e faturas liquidadas de uma UASG",
+    )
+    pagamentos.add_argument("--uasg", required=True, help="Código da unidade gestora")
+    pagamentos.add_argument("--sem-faturas", action="store_true", help="Não importar faturas")
+    pagamentos.add_argument("--max", type=int, default=None, help="Limite de contratos")
+    pagamentos.set_defaults(func=cmd_comprasnet_pagamentos)
+
+    servidores = sub.add_parser(
+        "transparencia-servidores",
+        help="Importa servidores e remunerações do Portal da Transparência (exige TRANSPARENCIA_API_KEY)",
+    )
+    servidores.add_argument("--orgao", required=True, help="Código SIAFI do órgão (ex.: 26439)")
+    servidores.add_argument("--mes", required=True, help="Mês/ano de referência (AAAAMM, ex.: 202501)")
+    servidores.add_argument("--campus", help="UORG do campus (ex.: 'IFSP - CAMPUS SALTO')")
+    servidores.add_argument("--max", type=int, default=None, help="Limite de servidores")
+    servidores.set_defaults(func=cmd_servidores)
 
     audit = sub.add_parser("audit", help="Executa o motor de auditoria")
     audit.add_argument("--limit", type=int, default=500)

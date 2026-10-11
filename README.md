@@ -136,9 +136,21 @@ python -m app.cli contracts --data-inicial 2026-01-01 --data-final 2026-01-31
 python -m app.cli comprasnet --uasg 158364 \
   --municipio 3545209 --nome-municipio Salto --uf SP
 
+# Execução financeira (empenhado/liquidado/pago) dos contratos de uma UASG
+python -m app.cli comprasnet-pagamentos --uasg 158364
+
+# Remuneração de servidores federais (exige TRANSPARENCIA_API_KEY)
+python -m app.cli transparencia-servidores --orgao 26439 --mes 202501 \
+  --campus "IFSP - CAMPUS SALTO"
+
 # Executar motor de auditoria
 python -m app.cli audit --limit 200
 ```
+
+> **Pagamentos:** os estágios são mantidos separados — “empenhado” reserva,
+> “liquidado” confere e “pago” efetiva. Valor contratado nunca é exibido como pago.
+> **Salários:** só são exibidos quando publicados oficialmente; sem a credencial do
+> Portal da Transparência, a plataforma informa explicitamente a indisponibilidade.
 
 > A importação do Comprasnet é idempotente (reimportar atualiza, não duplica) e
 > valida a UASG de cada registro, evitando atribuir contratos de outros campi.

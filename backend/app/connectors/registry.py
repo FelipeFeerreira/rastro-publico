@@ -5,10 +5,12 @@ from __future__ import annotations
 from app.connectors.base import BaseConnector
 from app.connectors.comprasnet import ComprasnetContratosConnector
 from app.connectors.pncp import PNCPConnector
+from app.connectors.transparencia import TransparenciaConnector
 
 CONNECTORS: dict[str, type[BaseConnector]] = {
     "pncp": PNCPConnector,
     "comprasnet": ComprasnetContratosConnector,
+    "transparencia": TransparenciaConnector,
 }
 
 

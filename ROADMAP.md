@@ -73,9 +73,12 @@ com busca funcional; API responde `/api/v1/health`; `pytest` e `vitest` verdes.
 - [x] Catálogo de fontes futuras (Portal da Transparência, Câmara) com status.
 - [x] **Conector Comprasnet Contratos** (federal, por UASG) com importação idempotente e
       piloto real do IFSP Campus Salto (UASG 158364): 253 contratos.
-- [ ] Conector do Portal da Transparência (exige chave de API).
+- [x] **Execução financeira real** (empenhado/liquidado/pago) do IFSP Salto:
+      1.776 lançamentos; estágios separados.
+- [x] **Busca de remuneração** (interface + API + ingestão) com verificação de campus
+      por UORG; **integração bloqueada** sem `TRANSPARENCIA_API_KEY`.
+- [ ] Conector do Portal da Transparência efetivamente ativo (requer chave de API).
 - [ ] Despesas parlamentares (Câmara dos Deputados).
-- [ ] Busca de remuneração onde legalmente disponível.
 - [ ] Conectores estaduais e municipais extensíveis.
 
 ## Milestone 7 — Monitoramento e produção ⬜

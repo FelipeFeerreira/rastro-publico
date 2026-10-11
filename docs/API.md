@@ -87,10 +87,33 @@ POST /analise/comparacao
 ```
 
 Resposta: distribuição (mediana, P25, P75, IQR), tamanho da amostra, metodologia,
-limitações e registros comparáveis.
+limitações e registros comparáveis. Inclui `classification` em linguagem simples
+(`dentro_da_faixa`, `acima_da_referencia`, `sem_dados`) e `compared_value`.
 
 Status de revisão válidos: `aguardando_verificacao`, `em_analise`, `documentado`,
 `encerrado_apos_analise`, `sem_irregularidade`.
+
+## Pagamentos (execução financeira)
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/pagamentos?uasg=&entity_id=&supplier_id=&stage=&year=&page=` | Lançamentos por estágio |
+| GET | `/contratos/{id}/pagamentos` | Lançamentos de um contrato |
+
+`stage` ∈ `empenhado` \| `liquidado` \| `pago`. O detalhe do contrato
+(`/contratos/{id}`) inclui `payment_summary` com os totais **por estágio** —
+estágios nunca são somados como se fossem o mesmo.
+
+## Servidores e remuneração
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/servidores?q=&uasg=&entity_id=&year=&page=` | Busca de servidores |
+| GET | `/servidores/{id}` | Detalhe com remunerações por mês |
+| GET | `/salarios/fontes` | Disponibilidade das fontes de remuneração |
+
+A busca usa `PublicPerson`/`Remuneration`. Valores só aparecem quando publicados
+oficialmente; a ausência é explícita.
 
 ## Assistente
 

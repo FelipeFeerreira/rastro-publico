@@ -11,10 +11,11 @@ from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.db.session import get_db
 from app.models.audit import AuditFinding
-from app.models.enums import FindingStatus
+from app.models.enums import FindingSeverity, FindingStatus
 from app.models.procurement import ProcurementItem
 from app.models.user import User
 from app.schemas.finding import ComparisonRequest, FindingOut, FindingReview
+from app.services.analysis.classification import classify_price
 from app.services.analysis.reference import find_comparables
 
 logger = get_logger(__name__)
@@ -44,10 +45,10 @@ def list_findings(
     stmt = select(AuditFinding)
     count_stmt = select(func.count()).select_from(AuditFinding)
     filters = []
-    if status:
-        filters.append(AuditFinding.status == status)
-    if severity:
-        filters.append(AuditFinding.severity == severity)
+    if status and status in VALID_STATUSES:
+        filters.append(AuditFinding.status == FindingStatus(status))
+    if severity and severity in {s.value for s in FindingSeverity}:
+        filters.append(AuditFinding.severity == FindingSeverity(severity))
     if entity_id:
         filters.append(AuditFinding.entity_id == entity_id)
     if procurement_id:
@@ -123,6 +124,7 @@ def compare_prices(payload: ComparisonRequest, db: Session = Depends(get_db)) ->
     unit = payload.unit
     reference_date = None
 
+    target_value: float | None = None
     if payload.item_id is not None:
         item = db.get(ProcurementItem, payload.item_id)
         if item is None:
@@ -132,6 +134,12 @@ def compare_prices(payload: ComparisonRequest, db: Session = Depends(get_db)) ->
         reference_date = (
             item.procurement.published_at.date() if item.procurement.published_at else None
         )
+        # Valor de referência do item: menor preço homologado; senão, o estimado.
+        prices = [float(r.unit_price) for r in item.results if r.unit_price is not None]
+        if prices:
+            target_value = min(prices)
+        elif item.unit_price_estimated is not None:
+            target_value = float(item.unit_price_estimated)
     if not category_key:
         raise HTTPException(
             status_code=422, detail="Informe category_key ou item_id para a comparação."
@@ -145,7 +153,10 @@ def compare_prices(payload: ComparisonRequest, db: Session = Depends(get_db)) ->
         window_months=payload.window_months,
         state_id=payload.state_id,
     )
+    classification = classify_price(target_value, dataset)
     return {
+        "classification": classification.to_dict(),
+        "compared_value": target_value,
         "category_key": dataset.category_key,
         "unit": dataset.unit,
         "sample_size": dataset.sample_size,

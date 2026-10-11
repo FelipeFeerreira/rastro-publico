@@ -189,8 +189,32 @@ class AmendmentOut(BaseModel):
     source_url: str | None = None
 
 
+class PaymentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    contract_id: int | None = None
+    stage: str
+    value: Decimal
+    reference_date: date | None = None
+    external_id: str | None = None
+    description: str | None = None
+    source_system: str = "pncp"
+    source_url: str | None = None
+    supplier_id: int | None = None
+
+
+class PaymentSummary(BaseModel):
+    """Resumo por estágio. Nunca somar estágios distintos como se fossem o mesmo."""
+
+    empenhado: Decimal = Decimal("0")
+    liquidado: Decimal = Decimal("0")
+    pago: Decimal = Decimal("0")
+    count: int = 0
+
+
 class ContractDetail(ContractSummary):
     process_number: str | None = None
     published_at: datetime | None = None
     amendments: list[AmendmentOut] = Field(default_factory=list)
+    payment_summary: PaymentSummary | None = None
     source: SourceOut | None = None

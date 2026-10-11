@@ -57,6 +57,25 @@ class ComprasnetContratosConnector(BaseConnector):
             return payload
         return payload.get("data", []) if isinstance(payload, dict) else []
 
+    # --- Execução financeira por contrato ---
+    def fetch_contract_commitments(self, external_id: str | int) -> list[dict[str, Any]]:
+        """Empenhos (estágios: empenhado, liquidado, pago) de um contrato."""
+        payload = self._request(
+            f"/api/contrato/{external_id}/empenhos", allow_not_found=True
+        )
+        if payload is None:
+            return []
+        return payload if isinstance(payload, list) else payload.get("data", [])
+
+    def fetch_contract_invoices(self, external_id: str | int) -> list[dict[str, Any]]:
+        """Faturas/notas de um contrato (com liquidação/pagamento)."""
+        payload = self._request(
+            f"/api/contrato/{external_id}/faturas", allow_not_found=True
+        )
+        if payload is None:
+            return []
+        return payload if isinstance(payload, list) else payload.get("data", [])
+
     def fetch_unit_contracts_all(
         self, uasg: str, *, include_inactive: bool = True
     ) -> list[dict[str, Any]]:

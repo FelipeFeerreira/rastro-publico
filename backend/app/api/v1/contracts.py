@@ -6,11 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.api.v1.payments import payment_summary
 from app.db.session import get_db
 from app.models.geo import GovernmentEntity, Municipality, State
-from app.models.procurement import Contract
+from app.models.procurement import Contract, Payment
 from app.schemas.common import Page
-from app.schemas.domain import ContractDetail, ContractSummary
+from app.schemas.domain import ContractDetail, ContractSummary, PaymentOut
 
 router = APIRouter(prefix="/contratos", tags=["Contratos"])
 
@@ -84,6 +85,21 @@ def get_contract(contract_id: int, db: Session = Depends(get_db)) -> ContractDet
     if contract is None:
         raise HTTPException(status_code=404, detail="Contrato não encontrado.")
     detail = ContractDetail.model_validate(contract)
+    detail.payment_summary = payment_summary(db, contract.id)
     if contract.source is not None:
         detail.source = contract.source  # type: ignore[assignment]
     return detail
+
+
+@router.get("/{contract_id}/pagamentos", response_model=list[PaymentOut])
+def contract_payments(
+    contract_id: int, db: Session = Depends(get_db)
+) -> list[dict]:
+    """Lançamentos de execução (empenhado, liquidado, pago) de um contrato."""
+    payments = db.scalars(
+        select(Payment)
+        .where(Payment.contract_id == contract_id)
+        .order_by(Payment.reference_date.desc().nullslast(), Payment.id.desc())
+        .limit(200)
+    )
+    return [PaymentOut.model_validate(p).model_dump() for p in payments]

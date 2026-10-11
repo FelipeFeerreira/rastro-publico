@@ -12,9 +12,10 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/busca", label: "Busca" },
   { href: "/contratacoes", label: "Contratações" },
-  { href: "/fornecedores", label: "Fornecedores" },
+  { href: "/fornecedores", label: "Empresas" },
   { href: "/orgaos", label: "Órgãos" },
-  { href: "/achados", label: "Achados" },
+  { href: "/salarios", label: "Salários" },
+  { href: "/achados", label: "Alertas" },
   { href: "/assistente", label: "Assistente" },
 ];
 

@@ -11,6 +11,7 @@ from app.models.geo import Municipality, State
 from app.models.procurement import Procurement
 from app.schemas.common import Page
 from app.schemas.domain import ProcurementDetail, ProcurementSummary
+from app.services import normalization as norm
 
 router = APIRouter(prefix="/contratacoes", tags=["Contratações"])
 
@@ -50,7 +51,7 @@ def list_procurements(
     if year:
         filters.append(Procurement.year == year)
     if modality:
-        filters.append(Procurement.modality == str(modality))
+        filters.append(Procurement.modality == norm.map_modality(modality))
 
     for f in filters:
         stmt = stmt.where(f)

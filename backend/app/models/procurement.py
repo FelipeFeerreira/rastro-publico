@@ -252,6 +252,9 @@ class Payment(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_payments_contract", "contract_id"),
         Index("ix_payments_stage_date", "stage", "reference_date"),
+        Index("ix_payments_entity_stage", "entity_id", "stage"),
+        # Idempotência por contrato + identificador externo (ex.: empenho:ID:estagio).
+        Index("ix_payments_contract_external", "contract_id", "external_id", unique=True),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -264,4 +267,9 @@ class Payment(Base, TimestampMixin):
     value: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
     reference_date: Mapped[date | None] = mapped_column(Date)
     external_id: Mapped[str | None] = mapped_column(String(80))
+    # Proveniência e descrição legível (natureza da despesa, nº do documento).
+    source_system: Mapped[str] = mapped_column(
+        String(20), default="pncp", server_default="pncp", nullable=False
+    )
+    description: Mapped[str | None] = mapped_column(Text)
     source_url: Mapped[str | None] = mapped_column(String(600))

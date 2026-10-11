@@ -186,7 +186,7 @@ class SearchService:
         if year:
             stmt = stmt.where(Procurement.year == year)
         if modality:
-            stmt = stmt.where(Procurement.modality == str(modality))
+            stmt = stmt.where(Procurement.modality == norm.map_modality(modality))
         if min_value is not None:
             stmt = stmt.where(Procurement.estimated_total >= min_value)
         if max_value is not None:

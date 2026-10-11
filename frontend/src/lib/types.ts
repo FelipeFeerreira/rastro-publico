@@ -133,11 +133,103 @@ export interface ContractSummary {
   source_url: string | null;
 }
 
+export interface PaymentSummary {
+  empenhado: number | string;
+  liquidado: number | string;
+  pago: number | string;
+  count: number;
+}
+
+export interface Payment {
+  id: number;
+  contract_id: number | null;
+  stage: string;
+  value: number | string;
+  reference_date: string | null;
+  external_id: string | null;
+  description: string | null;
+  source_system: string;
+  source_url: string | null;
+  supplier_id: number | null;
+}
+
 export interface ContractDetail extends ContractSummary {
   process_number: string | null;
   published_at: string | null;
   amendments: Amendment[];
+  payment_summary?: PaymentSummary | null;
   source?: Source | null;
+}
+
+export interface Remuneration {
+  id: number;
+  reference_year: number | null;
+  reference_month: number | null;
+  gross_amount: number | null;
+  net_amount: number | null;
+  deductions: number | null;
+  reference_date: string | null;
+  source_url: string | null;
+}
+
+export interface Person {
+  id: number;
+  name: string;
+  masked_document: string | null;
+  entity_id: number | null;
+  entity_name: string | null;
+  role_title: string | null;
+  source_url: string | null;
+  latest_gross: number | null;
+  latest_net: number | null;
+  latest_reference_year: number | null;
+  latest_reference_month: number | null;
+}
+
+export interface PersonDetail extends Person {
+  remunerations: Remuneration[];
+}
+
+export interface SalarySource {
+  code: string;
+  name: string;
+  status: string;
+  supports_salary: boolean;
+  credentials_required: boolean;
+  credentials_present: boolean;
+  note: string;
+}
+
+export interface PriceClassification {
+  status: string;
+  label: string;
+  explanation: string;
+  percent_difference: number | null;
+}
+
+export interface ComparisonResponse {
+  classification?: PriceClassification;
+  compared_value?: number | null;
+  sample_size: number;
+  conclusive: boolean;
+  unit: string | null;
+  distribution: {
+    count: number;
+    median: number | null;
+    p25: number | null;
+    p75: number | null;
+    iqr: number | null;
+    min: number | null;
+    max: number | null;
+  };
+  methodology: string;
+  limitations: string;
+  records: Array<{
+    unit_price: number | null;
+    unit: string | null;
+    supplier: string | null;
+    source_url?: string | null;
+  }>;
 }
 
 export interface Source {

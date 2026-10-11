@@ -14,7 +14,9 @@ from app.api.v1 import (
     health,
     investigations,
     monitoring,
+    payments,
     procurements,
+    salaries,
     search,
     sources,
     suppliers,
@@ -26,6 +28,8 @@ api_router.include_router(sources.router)
 api_router.include_router(search.router)
 api_router.include_router(procurements.router)
 api_router.include_router(contracts.router)
+api_router.include_router(payments.router)
+api_router.include_router(salaries.router)
 api_router.include_router(suppliers.router)
 api_router.include_router(entities.router)
 api_router.include_router(analysis.router)

@@ -16,28 +16,17 @@ import {
 } from "@/components/ui/table";
 import { comparePrices } from "@/lib/api";
 import { formatCurrency, formatNumber } from "@/lib/format";
-import type { ProcurementItem } from "@/lib/types";
+import type { ComparisonResponse, ProcurementItem } from "@/lib/types";
 
-interface ComparisonResult {
-  sample_size: number;
-  conclusive: boolean;
-  unit: string | null;
-  distribution: {
-    count: number;
-    median: number | null;
-    p25: number | null;
-    p75: number | null;
-    min: number | null;
-    max: number | null;
-  };
-  methodology: string;
-  limitations: string;
-  records: Array<{ unit_price: number | null; unit: string | null; supplier: string | null }>;
-}
+const CLASSIFICATION_STYLE: Record<string, string> = {
+  dentro_da_faixa: "border-success/40 bg-success/10 text-success",
+  acima_da_referencia: "border-warning/50 bg-warning/10 text-warning",
+  sem_dados: "border-border bg-muted/40 text-muted-foreground",
+};
 
 export function ItemComparison({ items }: { items: ProcurementItem[] }) {
   const [selected, setSelected] = React.useState<ProcurementItem | null>(null);
-  const [result, setResult] = React.useState<ComparisonResult | null>(null);
+  const [result, setResult] = React.useState<ComparisonResponse | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -47,7 +36,7 @@ export function ItemComparison({ items }: { items: ProcurementItem[] }) {
     setError(null);
     setLoading(true);
     try {
-      const data = (await comparePrices({ item_id: item.id })) as unknown as ComparisonResult;
+      const data = await comparePrices({ item_id: item.id });
       setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível comparar agora.");
@@ -129,7 +118,21 @@ export function ItemComparison({ items }: { items: ProcurementItem[] }) {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            {result && !result.conclusive && (
+            {result?.classification && (
+              <div
+                className={`flex items-start gap-2 rounded-md border p-3 text-sm ${
+                  CLASSIFICATION_STYLE[result.classification.status] ?? CLASSIFICATION_STYLE.sem_dados
+                }`}
+              >
+                <AlertTriangle className="mt-0.5 size-4" />
+                <div>
+                  <p className="font-medium">{result.classification.label}</p>
+                  <p className="mt-1 text-foreground/80">{result.classification.explanation}</p>
+                </div>
+              </div>
+            )}
+
+            {result && !result.classification && !result.conclusive && (
               <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
                 <AlertTriangle className="mt-0.5 size-4 text-warning" />
                 <p>

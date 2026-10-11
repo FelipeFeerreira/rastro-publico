@@ -7,8 +7,9 @@ const columns = [
     links: [
       { href: "/busca", label: "Busca" },
       { href: "/contratacoes", label: "Contratações" },
-      { href: "/fornecedores", label: "Fornecedores" },
+      { href: "/fornecedores", label: "Empresas e fornecedores" },
       { href: "/orgaos", label: "Órgãos e entidades" },
+      { href: "/salarios", label: "Salários de servidores" },
     ],
   },
   {

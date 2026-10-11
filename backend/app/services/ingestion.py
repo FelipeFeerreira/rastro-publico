@@ -15,18 +15,22 @@ from sqlalchemy.orm import Session
 
 from app.connectors.comprasnet import ComprasnetContratosConnector
 from app.connectors.pncp import PNCPConnector
+from app.connectors.transparencia import TRANSPARENCIA_BASE_URL, TransparenciaConnector
 from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.models.enums import (
     CollectionStatus,
     ContractStatus,
+    FinancialStage,
     GovernmentPower,
     GovernmentSphere,
     SourceStatus,
 )
 from app.models.geo import GovernmentEntity, Municipality, State
+from app.models.person import PublicPerson, Remuneration
 from app.models.procurement import (
     Contract,
+    Payment,
     Procurement,
     ProcurementItem,
     ProcurementResult,
@@ -758,6 +762,364 @@ class IngestionService:
             stats.record_error(str(exc))
             status = CollectionStatus.FAILED
             logger.exception("Execução Comprasnet falhou: %s", exc)
+        finally:
+            self._finish_run(run, stats, status)
+
+        return run
+
+    # ------------------------------------------------------------------ #
+    # Comprasnet — execução financeira (empenhos e faturas)
+    # ------------------------------------------------------------------ #
+    def _upsert_payment(
+        self,
+        contract: Contract,
+        *,
+        stage: FinancialStage,
+        value: Any,
+        reference_date: Any,
+        external_id: str,
+        description: str | None,
+        source_url: str | None,
+        supplier_id: int | None,
+        source: DataSource,
+    ) -> bool:
+        """Insere/atualiza um lançamento. Retorna True se novo. Nunca usa 0 por padrão."""
+        parsed = norm.parse_decimal(value)
+        if parsed is None:
+            return False
+
+        payment = self.db.scalar(
+            select(Payment).where(
+                Payment.contract_id == contract.id,
+                Payment.external_id == external_id,
+            )
+        )
+        is_new = payment is None
+        if payment is None:
+            payment = Payment(
+                contract_id=contract.id,
+                external_id=external_id,
+                stage=stage,
+                value=parsed,
+            )
+            self.db.add(payment)
+
+        payment.entity_id = contract.entity_id
+        payment.supplier_id = supplier_id
+        payment.stage = stage
+        payment.value = parsed
+        payment.reference_date = norm.parse_date(reference_date)
+        payment.description = description
+        payment.source_system = source.code
+        payment.source_url = source_url or contract.source_url
+        self.db.flush()
+        return is_new
+
+    def ingest_comprasnet_payments(
+        self,
+        uasg: str,
+        *,
+        include_invoices: bool = True,
+        max_contracts: int | None = None,
+    ) -> CollectionRun:
+        """Importa empenhos (estágios) e faturas liquidadas dos contratos de uma UASG.
+
+        Só importa contratos já sincronizados (source_system='comprasnet', uasg).
+        Não confunde valor contratado com valor pago: cada lançamento tem seu estágio.
+        """
+        source = get_source(self.db, "comprasnet")
+        params = {
+            "uasg": uasg,
+            "incluir_faturas": include_invoices,
+            "max": max_contracts,
+        }
+        run = self._start_run(source, scope=f"comprasnet/pagamentos/ug/{uasg}", params=params)
+        stats = IngestionStats()
+        status = CollectionStatus.SUCCESS
+
+        contracts = list(
+            self.db.scalars(
+                select(Contract)
+                .where(
+                    Contract.source_system == "comprasnet",
+                    Contract.uasg == str(uasg),
+                )
+                .order_by(Contract.id)
+            )
+        )
+        if max_contracts is not None:
+            contracts = contracts[:max_contracts]
+
+        if not contracts:
+            stats.record_error(
+                f"Nenhum contrato de {uasg} encontrado. Importe contratos antes dos pagamentos."
+            )
+
+        try:
+            with ComprasnetContratosConnector() as connector:
+                for contract in contracts:
+                    stats.fetched += 1
+                    try:
+                        with self.db.begin_nested():
+                            self._ingest_contract_payments(
+                                connector, contract, source, run, stats, include_invoices
+                            )
+                    except Exception as exc:  # noqa: BLE001
+                        stats.record_error(f"contrato {contract.external_id}: {exc}")
+                        logger.warning("Erro ao ingerir pagamentos: %s", exc)
+                    if stats.fetched % 50 == 0:
+                        self.db.commit()
+                self.db.commit()
+
+            if stats.errors and (stats.inserted + stats.updated):
+                status = CollectionStatus.PARTIAL
+            elif stats.errors and not (stats.inserted + stats.updated):
+                status = CollectionStatus.FAILED
+        except Exception as exc:  # noqa: BLE001
+            stats.record_error(str(exc))
+            status = CollectionStatus.FAILED
+            logger.exception("Execução de pagamentos Comprasnet falhou: %s", exc)
+        finally:
+            self._finish_run(run, stats, status)
+
+        return run
+
+    def _ingest_contract_payments(
+        self,
+        connector: ComprasnetContratosConnector,
+        contract: Contract,
+        source: DataSource,
+        run: CollectionRun | None,
+        stats: IngestionStats,
+        include_invoices: bool,
+    ) -> None:
+        supplier_id: int | None = None
+
+        for emp in connector.fetch_contract_commitments(contract.external_id or ""):
+            credor = emp.get("credor_obj") or {}
+            supplier = self._supplier(
+                credor.get("cnpj_cpf_idgener"),
+                credor.get("nome"),
+                credor.get("tipo"),
+            )
+            if supplier is not None:
+                supplier_id = supplier.id
+            payment_link = (emp.get("links") or {}).get("documento_pagamento")
+            numero = emp.get("numero") or emp.get("id")
+            natureza = emp.get("naturezadespesa") or ""
+            for stage_name, value in (
+                ("empenhado", emp.get("empenhado")),
+                ("liquidado", emp.get("liquidado")),
+                ("pago", emp.get("pago")),
+            ):
+                stage = {
+                    "empenhado": FinancialStage.EMPENHADO,
+                    "liquidado": FinancialStage.LIQUIDADO,
+                    "pago": FinancialStage.PAGO,
+                }[stage_name]
+                is_new = self._upsert_payment(
+                    contract,
+                    stage=stage,
+                    value=value,
+                    reference_date=emp.get("data_emissao"),
+                    external_id=f"empenho:{emp.get('id')}:{stage_name}",
+                    description=f"Empenho {numero} — {natureza}".strip(" —"),
+                    source_url=payment_link,
+                    supplier_id=supplier_id,
+                    source=source,
+                )
+                stats.inserted += int(is_new)
+                stats.updated += int(not is_new and value is not None)
+
+        if not include_invoices:
+            return
+
+        for fat in connector.fetch_contract_invoices(contract.external_id or ""):
+            # Só faturas efetivamente liquidadas/pagas entram como pagamento.
+            if not fat.get("data_liquidacao"):
+                continue
+            supplier = self._supplier(
+                fat.get("fornecedor_contrato"),
+                None,
+                None,
+            )
+            if supplier is not None:
+                supplier_id = supplier.id
+            is_new = self._upsert_payment(
+                contract,
+                stage=FinancialStage.LIQUIDADO,
+                value=fat.get("valorliquido") or fat.get("valor"),
+                reference_date=fat.get("data_liquidacao") or fat.get("vencimento"),
+                external_id=f"fatura:{fat.get('id')}",
+                description=f"Fatura {fat.get('numero')} — {fat.get('tipo_instrumento_cobranca') or ''}".strip(" —"),
+                source_url=contract.source_url,
+                supplier_id=supplier_id,
+                source=source,
+            )
+            stats.inserted += int(is_new)
+            stats.updated += int(not is_new)
+
+    # ------------------------------------------------------------------ #
+    # Portal da Transparência — servidores e remuneração (Exige chave)
+    # ------------------------------------------------------------------ #
+    def _entity_for_campus(self, campus_name: str | None) -> GovernmentEntity | None:
+        """Localiza a entidade (campus) cujo nome normalizado coincide com a UORG."""
+        if not campus_name:
+            return None
+        target = norm.normalize_text(campus_name)
+        for entity in self.db.scalars(select(GovernmentEntity)):
+            if norm.normalize_text(entity.name) == target:
+                return entity
+        return None
+
+    def _upsert_person(
+        self,
+        name: str,
+        masked_document: str | None,
+        role_title: str | None,
+        entity: GovernmentEntity | None,
+        source: DataSource,
+    ) -> PublicPerson:
+        person = self.db.scalar(
+            select(PublicPerson).where(
+                PublicPerson.name == name,
+                PublicPerson.entity_id == (entity.id if entity else None),
+            )
+        )
+        if person is None:
+            person = PublicPerson(
+                name=name,
+                masked_document=masked_document,
+                role_title=role_title,
+                entity_id=entity.id if entity else None,
+                source_id=source.id,
+                search_text=norm.build_search_text(name, role_title, entity.name if entity else None),
+            )
+            self.db.add(person)
+            self.db.flush()
+        else:
+            if masked_document and not person.masked_document:
+                person.masked_document = masked_document
+            if role_title and not person.role_title:
+                person.role_title = role_title
+        return person
+
+    def _upsert_remuneration(
+        self,
+        person: PublicPerson,
+        entity: GovernmentEntity | None,
+        info: dict[str, Any],
+        source_url: str | None,
+    ) -> bool:
+        year, month = info.get("year"), info.get("month")
+        existing = self.db.scalar(
+            select(Remuneration).where(
+                Remuneration.person_id == person.id,
+                Remuneration.reference_year == year,
+                Remuneration.reference_month == month,
+            )
+        )
+        is_new = existing is None
+        remuneration = existing or Remuneration(person_id=person.id)
+        if is_new:
+            self.db.add(remuneration)
+        remuneration.entity_id = entity.id if entity else None
+        remuneration.reference_year = year
+        remuneration.reference_month = month
+        remuneration.gross_amount = norm.parse_decimal(info.get("gross"))
+        remuneration.net_amount = norm.parse_decimal(info.get("net"))
+        remuneration.source_url = source_url
+        remuneration.reference_date = None
+        self.db.flush()
+        return is_new
+
+    def ingest_transparencia_servidores(
+        self,
+        orgao_code: str,
+        mes_ano: str,
+        *,
+        campus_uorg: str | None = None,
+        max_servidores: int | None = None,
+    ) -> CollectionRun:
+        """Importa servidores e remunerações de um órgão federal.
+
+        Exige `TRANSPARENCIA_API_KEY`. Se `campus_uorg` for informado, apenas
+        servidores cuja lotação (UORG) corresponder são associados ao campus —
+        evitando atribuir todos os servidores do IFSP a um único campus.
+        """
+        source = get_source(self.db, "transparencia")
+        params = {
+            "orgao": orgao_code,
+            "mesAno": mes_ano,
+            "campus_uorg": campus_uorg,
+            "max": max_servidores,
+        }
+        run = self._start_run(
+            source, scope=f"transparencia/servidores/orgao/{orgao_code}", params=params
+        )
+        stats = IngestionStats()
+        status = CollectionStatus.SUCCESS
+        uri = f"{TRANSPARENCIA_BASE_URL}/servidores?orgaoServidorLotacao={orgao_code}"
+
+        try:
+            with TransparenciaConnector() as connector:
+                if not connector.credentials_available:
+                    stats.record_error(
+                        "Credencial ausente: TRANSPARENCIA_API_KEY não configurada. "
+                        "Nenhum dado de remuneração foi importado."
+                    )
+                    status = CollectionStatus.FAILED
+                else:
+                    servidores = connector.fetch_servidores(orgao_code)
+                    if max_servidores is not None:
+                        servidores = servidores[:max_servidores]
+                    skipped_other_campus = 0
+                    for servidor in servidores:
+                        stats.fetched += 1
+                        try:
+                            with self.db.begin_nested():
+                                sid = servidor.get("id") or servidor.get("idServidorAposentadoPensionista")
+                                detail = connector.fetch_servidor(sid) if sid else None
+                                campus = TransparenciaConnector.extract_campus_uorg(detail)
+                                if campus_uorg and campus and norm.normalize_text(campus) != norm.normalize_text(campus_uorg):
+                                    skipped_other_campus += 1
+                                    stats.skipped += 1
+                                    continue
+                                name = TransparenciaConnector.extract_name(servidor) or (
+                                    TransparenciaConnector.extract_name(detail or {})
+                                )
+                                if not name:
+                                    stats.skipped += 1
+                                    continue
+                                entity = self._entity_for_campus(campus)
+                                person = self._upsert_person(
+                                    name,
+                                    TransparenciaConnector.extract_masked_document(servidor),
+                                    TransparenciaConnector.extract_role(servidor),
+                                    entity,
+                                    source,
+                                )
+                                for rem in connector.fetch_remuneracao(sid, mes_ano):
+                                    info = TransparenciaConnector.extract_remuneracao(rem)
+                                    is_new = self._upsert_remuneration(person, entity, info, uri)
+                                    stats.inserted += int(is_new)
+                                    stats.updated += int(not is_new)
+                        except Exception as exc:  # noqa: BLE001
+                            stats.record_error(f"{servidor.get('id', '?')}: {exc}")
+                    if skipped_other_campus:
+                        logger.info(
+                            "Servidores de outros campi ignorados: %s", skipped_other_campus
+                        )
+                    self.db.commit()
+
+                    if stats.errors and (stats.inserted + stats.updated):
+                        status = CollectionStatus.PARTIAL
+                    elif stats.errors and not (stats.inserted + stats.updated):
+                        status = CollectionStatus.FAILED
+        except Exception as exc:  # noqa: BLE001
+            stats.record_error(str(exc))
+            status = CollectionStatus.FAILED
+            logger.exception("Execução de servidores do Portal da Transparência falhou: %s", exc)
         finally:
             self._finish_run(run, stats, status)
 

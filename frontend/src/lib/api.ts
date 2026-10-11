@@ -1,6 +1,7 @@
 import type {
   AssistantAnswer,
   AuthUser,
+  ComparisonResponse,
   ContractDetail,
   ContractSummary,
   Coverage,
@@ -10,8 +11,12 @@ import type {
   Investigation,
   Municipality,
   Page,
+  Payment,
+  Person,
+  PersonDetail,
   ProcurementDetail,
   ProcurementSummary,
+  SalarySource,
   SearchResponse,
   Source,
   State,
@@ -182,10 +187,32 @@ export function getFinding(publicId: string) {
 }
 
 export function comparePrices(payload: Record<string, unknown>) {
-  return apiFetch<Record<string, unknown>>(`/analise/comparacao`, {
+  return apiFetch<ComparisonResponse>(`/analise/comparacao`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+// --- Pagamentos (execução financeira) ---
+export function listPayments(params: Record<string, string | number | undefined>) {
+  return apiFetch<Page<Payment>>(`/pagamentos${qs(params)}`);
+}
+
+export function getContractPayments(contractId: string | number) {
+  return apiFetch<Payment[]>(`/contratos/${contractId}/pagamentos`);
+}
+
+// --- Servidores e remuneração ---
+export function listServidores(params: Record<string, string | number | undefined>) {
+  return apiFetch<Page<Person>>(`/servidores${qs(params)}`);
+}
+
+export function getServidor(id: string | number) {
+  return apiFetch<PersonDetail>(`/servidores/${id}`);
+}
+
+export function listSalarySources() {
+  return apiFetch<SalarySource[]>(`/salarios/fontes`, { next: { revalidate: 60 } });
 }
 
 // --- Assistente ---
