@@ -75,7 +75,13 @@ class BaseConnector:
         if wait > 0:
             time.sleep(wait)
 
-    def _request(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    def _request(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        *,
+        allow_not_found: bool = False,
+    ) -> Any:
         if self._client is None:
             raise ConnectorError("Conector usado fora do contexto (use `with`).")
 
@@ -87,6 +93,12 @@ class BaseConnector:
             try:
                 response = self._client.get(path, params=clean_params)
                 self._last_request_at = time.monotonic()
+
+                # Algumas fontes retornam 404 para um recurso inexistente
+                # (ex.: unidade sem contratos). Quando explicitamente permitido,
+                # isso é tratado como "vazio", não como falha.
+                if allow_not_found and response.status_code == 404:
+                    return None
 
                 if response.status_code == 429:
                     retry_after = float(response.headers.get("Retry-After", "1"))

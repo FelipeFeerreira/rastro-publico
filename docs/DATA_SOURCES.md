@@ -57,11 +57,66 @@ oficial.
 
 ---
 
-## 4. Compras.gov.br
+## 4. Comprasnet Contratos (Contratos.gov.br) ✅ integrado (federal, por UASG)
 
-- **Portal:** https://www.gov.br/compras/
-- **Observação:** grande parte dos dados federais de contratações é publicada também no
-  PNCP. A integração dedicada será avaliada após os conectores de execução financeira.
+- **Portal:** https://contratos.comprasnet.gov.br/
+- **OpenAPI:** https://contratos.comprasnet.gov.br/docs/api-docs.json
+- **Swagger:** https://contratos.comprasnet.gov.br/api/docs
+- **Autenticação:** não exigida para leitura.
+- **Cobertura:** contratos administrativos e empenhos com força de contrato das
+  **unidades gestoras federais (UASG)**, ativos e inativos.
+
+### Endpoints utilizados (verificados)
+
+| Uso | Rota | Observações |
+|-----|------|-------------|
+| Contratos ativos | `GET /api/contrato/ug/{uasg}` | Lista sem paginação |
+| Contratos inativos | `GET /api/contrato/inativo/ug/{uasg}` | Lista sem paginação |
+| Registro original | `GET /api/contrato/id/{id}` | URL preservada em `contracts.source_url` |
+
+### Identidade da unidade — atenção
+
+- A chave de unidade é a **unidade gestora** (`contratante.orgao.unidade_gestora.codigo`),
+  **não** o campo `unidade_compra` (que pode apontar para outra unidade requisitante).
+- O código do órgão pai (ex.: IFSP `26439`) **não** isola o campus: outro campus do IFSP
+  compartilha o mesmo órgão (e o mesmo CNPJ institucional). O filtro confiável é a UASG.
+- A importação valida cada registro contra a UASG solicitada e rejeita divergências.
+
+### Piloto verificado: IFSP Campus Salto (UASG 158364)
+
+- Órgão pai: `26439` (IFSP). Município: Salto/SP (IBGE `3545209`). Âmbito: **federal**.
+- Resposta ao vivo (2026-10-11): **233 contratos ativos + 20 inativos = 253**;
+  todos com `unidade_gestora.codigo = 158364` e `orgao.codigo = 26439`.
+- Tipos observados: `Contrato`, `Empenho`, `Termo de Adesão`, `Outros`.
+
+### Comando de importação
+
+```bash
+python -m app.cli comprasnet --uasg 158364 \
+  --municipio 3545209 --nome-municipio Salto --uf SP
+# opções: --sem-inativos  --max N
+```
+
+### Procedimento de verificação
+
+```bash
+# 1) contagens no banco por sistema/UASG
+python -m app.cli stats
+# 2) via API
+curl "http://localhost:8000/api/v1/contratos?uasg=158364&page_size=1"          # total = 253
+curl "http://localhost:8000/api/v1/contratos?source_system=comprasnet"          # total = 253
+curl "http://localhost:8000/api/v1/orgaos?uasg=158364"                          # IFSP - CAMPUS SALTO
+```
+
+### Reconciliação com o PNCP
+
+Um mesmo contrato pode aparecer no PNCP e no Comprasnet. As tabelas preservam
+`source_system` + `external_id` (chave natural única por sistema), mantendo múltiplas
+proveniências separadas em vez de sobrescrever registros.
+
+> **Nota futura:** o site histórico de Compras.gov.br foi reorganizado; grande parte dos
+> dados federais de contratações também é publicada no PNCP. Integrações de execução
+> financeira serão avaliadas separadamente.
 
 ---
 

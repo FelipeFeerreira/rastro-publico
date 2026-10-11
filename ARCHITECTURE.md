@@ -115,6 +115,25 @@ Pontos importantes observados na API real:
 `Retry-After`, limitação de taxa e paginação padronizada. Falhas por registro são
 toleradas (`begin_nested`) sem interromper a execução completa.
 
+### Conector Comprasnet Contratos (federal, por UASG)
+
+`connectors/comprasnet.py` reutiliza `BaseConnector` e importa contratos de uma
+**unidade gestora (UASG)** específica:
+
+- `GET /api/contrato/ug/{uasg}` (ativos) e `/api/contrato/inativo/ug/{uasg}` (inativos).
+- A **unidade gestora** (`contratante.orgao.unidade_gestora.codigo`) é a chave confiável;
+  o código do órgão pai e o campo `unidade_compra` **não** isolam o campus.
+- Cada registro é validado contra a UASG solicitada; divergências são rejeitadas
+  (proteção contra atribuir contratos de outros campi).
+- Proveniência: `contracts.source_system`, `external_id`, `uasg`, `organization_code`,
+  `contract_type`, `accumulated_value`; a URL original (`/api/contrato/id/{id}`) é
+  preservada em `source_url`.
+- Identidade do campus: `government_entities.uasg` (entidade federal própria, distinta do
+  CNPJ institucional compartilhado).
+
+Isso mantém despesas **federais** (IFSP) separadas das **municipais**, filtráveis por
+`uasg`, `source_system` e `organization_code` em `/contratos`.
+
 ## 5. Motor de análise
 
 ### Preço unitário

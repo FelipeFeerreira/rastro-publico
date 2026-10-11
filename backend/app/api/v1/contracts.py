@@ -24,10 +24,23 @@ def list_contracts(
     entity_id: int | None = None,
     supplier_id: int | None = None,
     year: int | None = None,
+    uasg: str | None = Query(default=None, description="Filtra pela unidade gestora (UASG)"),
+    source_system: str | None = Query(
+        default=None, description="Sistema de origem: pncp | comprasnet"
+    ),
+    organization_code: str | None = Query(
+        default=None, description="Código do órgão de origem (ex.: 26439)"
+    ),
 ) -> Page[ContractSummary]:
     stmt = select(Contract)
     count_stmt = select(func.count()).select_from(Contract)
     filters = []
+    if uasg:
+        filters.append(Contract.uasg == uasg)
+    if source_system:
+        filters.append(Contract.source_system == source_system)
+    if organization_code:
+        filters.append(Contract.organization_code == organization_code)
     if uf:
         filters.append(
             Contract.entity_id.in_(

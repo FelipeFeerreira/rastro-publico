@@ -45,6 +45,26 @@ DATA_SOURCES: list[dict] = [
         "status": SourceStatus.ACTIVE,
     },
     {
+        "code": "comprasnet",
+        "name": "Comprasnet Contratos (Contratos.gov.br)",
+        "description": (
+            "Contratos administrativos e empenhos com força de contrato das "
+            "unidades gestoras federais (UASG), incluindo contratos ativos e "
+            "inativos."
+        ),
+        "homepage_url": "https://contratos.comprasnet.gov.br/",
+        "api_documentation_url": "https://contratos.comprasnet.gov.br/api/docs",
+        "license_name": "Dados Abertos Governamentais",
+        "license_url": "https://www.gov.br/compras/pt-br/acesso-a-informacao",
+        "requires_authentication": False,
+        "coverage_description": (
+            "Âmbito federal, por unidade gestora (UASG). A cobertura depende da "
+            "unidade consultada; contratos ativos e inativos são coletados "
+            "separadamente."
+        ),
+        "status": SourceStatus.ACTIVE,
+    },
+    {
         "code": "transparencia",
         "name": "Portal da Transparência do Governo Federal",
         "description": (

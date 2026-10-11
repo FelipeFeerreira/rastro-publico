@@ -68,9 +68,11 @@ com busca funcional; API responde `/api/v1/health`; `pytest` e `vitest` verdes.
 - [ ] RAG sobre documentos oficiais completos (PDFs de editais/contratos).
 - [ ] Sugestão automatizada de próximos passos de investigação.
 
-## Milestone 6 — Expansão de transparência ⬜
+## Milestone 6 — Expansão de transparência 🟡
 
 - [x] Catálogo de fontes futuras (Portal da Transparência, Câmara) com status.
+- [x] **Conector Comprasnet Contratos** (federal, por UASG) com importação idempotente e
+      piloto real do IFSP Campus Salto (UASG 158364): 253 contratos.
 - [ ] Conector do Portal da Transparência (exige chave de API).
 - [ ] Despesas parlamentares (Câmara dos Deputados).
 - [ ] Busca de remuneração onde legalmente disponível.

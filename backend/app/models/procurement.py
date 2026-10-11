@@ -168,6 +168,9 @@ class Contract(Base, TimestampMixin):
         Index("ix_contracts_pncp_number", "pncp_control_number", unique=True),
         Index("ix_contracts_supplier", "supplier_id"),
         Index("ix_contracts_entity_year", "entity_id", "year"),
+        # Chave natural por sistema de origem (PNCP, Comprasnet, ...).
+        Index("ix_contracts_source_external", "source_system", "external_id", unique=True),
+        Index("ix_contracts_uasg", "uasg"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -175,6 +178,18 @@ class Contract(Base, TimestampMixin):
     entity_id: Mapped[int] = mapped_column(ForeignKey("government_entities.id"), nullable=False)
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"))
     procurement_id: Mapped[int | None] = mapped_column(ForeignKey("procurements.id"))
+
+    # Proveniência: sistema de origem e identificador externo preservado.
+    source_system: Mapped[str] = mapped_column(
+        String(20), default="pncp", server_default="pncp", nullable=False
+    )
+    external_id: Mapped[str | None] = mapped_column(String(64))
+    # Unidade Gestora (UASG) e órgão de origem — permitem filtro por campus.
+    uasg: Mapped[str | None] = mapped_column(String(20))
+    organization_code: Mapped[str | None] = mapped_column(String(20))
+    contract_type: Mapped[str | None] = mapped_column(String(60))
+    # Valor acumulado (execução), distinto de valor global/contratado.
+    accumulated_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
 
     pncp_control_number: Mapped[str | None] = mapped_column(String(40))
     year: Mapped[int | None] = mapped_column(Integer)

@@ -13,11 +13,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.connectors.comprasnet import ComprasnetContratosConnector
 from app.connectors.pncp import PNCPConnector
 from app.core.logging import get_logger
 from app.db.base import utcnow
 from app.models.enums import (
     CollectionStatus,
+    ContractStatus,
     GovernmentPower,
     GovernmentSphere,
     SourceStatus,
@@ -146,7 +148,7 @@ class IngestionService:
             display_name = name or doc
             supplier = Supplier(
                 document=doc,
-                document_type=doc_type,
+                document_type=norm.normalize_document_type(doc_type),
                 name=display_name,
                 is_individual=len(doc) == 11,
                 search_text=norm.build_search_text(display_name),
@@ -523,6 +525,7 @@ class IngestionService:
             self.db.add(contract)
 
         contract.entity_id = entity.id
+        contract.source_system = "pncp"
         contract.supplier_id = supplier.id if supplier else None
         contract.year = raw.get("anoContrato")
         contract.sequential = raw.get("sequencialContrato")
@@ -545,3 +548,217 @@ class IngestionService:
         )
         self.db.flush()
         return contract, is_new
+
+    # ------------------------------------------------------------------ #
+    # Comprasnet Contratos (federal, por unidade gestora / UASG)
+    # ------------------------------------------------------------------ #
+    def _entity_by_uasg(
+        self,
+        uasg: str,
+        name: str,
+        state: State | None,
+        municipality: Municipality | None,
+        source: DataSource,
+    ) -> GovernmentEntity:
+        """Resolve/cria a entidade do campus por UASG (não por CNPJ institucional).
+
+        Um mesmo CNPJ institucional (ex.: IFSP) é compartilhado por vários campi;
+        por isso a identidade confiável da unidade é a UASG.
+        """
+        entity = self.db.scalar(
+            select(GovernmentEntity).where(GovernmentEntity.uasg == uasg)
+        )
+        if entity is None:
+            entity = GovernmentEntity(
+                uasg=uasg,
+                name=name,
+                sphere=GovernmentSphere.FEDERAL,
+                power=GovernmentPower.EXECUTIVE,
+                state_id=state.id if state else None,
+                municipality_id=municipality.id if municipality else None,
+                source_id=source.id,
+                search_text=norm.build_search_text(name),
+            )
+            self.db.add(entity)
+            self.db.flush()
+        else:
+            # Mantém o nome/local atualizados sem duplicar a entidade.
+            if name and entity.name != name:
+                entity.name = name
+            if state and entity.state_id is None:
+                entity.state_id = state.id
+            if municipality and entity.municipality_id is None:
+                entity.municipality_id = municipality.id
+        return entity
+
+    @staticmethod
+    def _map_comprasnet_status(situacao: str | None) -> ContractStatus:
+        value = (situacao or "").strip().lower()
+        if value.startswith("inativ"):
+            return ContractStatus.ENCERRADO
+        if value.startswith("ativ"):
+            return ContractStatus.VIGENTE
+        return ContractStatus.DESCONHECIDO
+
+    def upsert_comprasnet_contract(
+        self,
+        raw: dict[str, Any],
+        source: DataSource,
+        run: CollectionRun | None,
+        *,
+        entity: GovernmentEntity,
+        uasg: str,
+    ) -> tuple[Contract, bool]:
+        """Insere/atualiza um contrato do Comprasnet. Idempotente por (source, id)."""
+        external_id = str(raw.get("id") or "").strip()
+        if not external_id:
+            raise ValueError("Contrato Comprasnet sem identificador (id)")
+        if not raw.get("objeto"):
+            raise ValueError("Contrato Comprasnet sem objeto")
+
+        # Guarda de segurança: nunca atribuir contrato de outra UASG ao campus.
+        raw_uasg = ComprasnetContratosConnector.extract_uasg(raw)
+        if str(raw_uasg) != str(uasg):
+            raise ValueError(
+                f"UASG divergente: contrato {external_id} pertence à unidade "
+                f"'{raw_uasg}', esperado '{uasg}'"
+            )
+
+        supplier = self._supplier(
+            (raw.get("fornecedor") or {}).get("cnpj_cpf_idgener"),
+            (raw.get("fornecedor") or {}).get("nome"),
+            (raw.get("fornecedor") or {}).get("tipo"),
+        )
+
+        signed_at = norm.parse_date(raw.get("data_assinatura"))
+        year = signed_at.year if signed_at else None
+        if year is None:
+            numero = str(raw.get("numero") or "")
+            if "/" in numero:
+                tail = numero.rsplit("/", 1)[-1]
+                year = int(tail) if tail.isdigit() else None
+
+        contract = self.db.scalar(
+            select(Contract).where(
+                Contract.source_system == "comprasnet",
+                Contract.external_id == external_id,
+            )
+        )
+        is_new = contract is None
+        if contract is None:
+            contract = Contract(
+                source_system="comprasnet",
+                external_id=external_id,
+                source_id=source.id,
+                entity_id=entity.id,
+                object_description=raw.get("objeto") or "(objeto não informado)",
+            )
+            self.db.add(contract)
+
+        contract.entity_id = entity.id
+        contract.supplier_id = supplier.id if supplier else None
+        contract.uasg = str(uasg)
+        contract.organization_code = ComprasnetContratosConnector.extract_organization_code(raw)
+        contract.contract_type = raw.get("tipo")
+        contract.number = raw.get("numero")
+        contract.year = year
+        contract.process_number = raw.get("processo")
+        contract.object_description = raw.get("objeto") or "(objeto não informado)"
+        contract.initial_value = norm.parse_decimal(raw.get("valor_inicial"))
+        contract.global_value = norm.parse_decimal(raw.get("valor_global"))
+        contract.accumulated_value = norm.parse_decimal(raw.get("valor_acumulado"))
+        contract.status = self._map_comprasnet_status(raw.get("situacao"))
+        contract.signed_at = signed_at
+        contract.effective_from = norm.parse_date(raw.get("vigencia_inicio"))
+        contract.effective_until = norm.parse_date(raw.get("vigencia_fim"))
+        contract.published_at = norm.parse_datetime(raw.get("data_publicacao"))
+        contract.collected_at = utcnow()
+        contract.collection_run_id = run.id if run else None
+        contract.source_url = ComprasnetContratosConnector.contract_source_url(external_id)
+        contract.search_text = norm.build_search_text(
+            contract.object_description,
+            contract.number,
+            entity.name,
+            (raw.get("fornecedor") or {}).get("nome"),
+        )
+        self.db.flush()
+        return contract, is_new
+
+    def ingest_comprasnet_contracts(
+        self,
+        uasg: str,
+        *,
+        include_inactive: bool = True,
+        municipality_ibge: str | None = None,
+        municipality_name: str | None = None,
+        uf: str | None = None,
+        max_contracts: int | None = None,
+    ) -> CollectionRun:
+        """Importa contratos de uma UASG específica (ex.: IFSP Campus Salto)."""
+        source = get_source(self.db, "comprasnet")
+        params = {
+            "uasg": uasg,
+            "incluir_inativos": include_inactive,
+            "municipio": municipality_ibge,
+            "uf": uf,
+            "max": max_contracts,
+        }
+        run = self._start_run(source, scope=f"comprasnet/contratos/ug/{uasg}", params=params)
+        stats = IngestionStats()
+        status = CollectionStatus.SUCCESS
+
+        state = self._state(uf, None) if uf else None
+        municipality = None
+        if municipality_ibge:
+            municipality = self._municipality(municipality_ibge, municipality_name, state)
+            if municipality is None:
+                stats.record_error(
+                    f"Município {municipality_ibge} não pôde ser resolvido (UF ausente?)"
+                )
+
+        try:
+            with ComprasnetContratosConnector() as connector:
+                records = connector.fetch_unit_contracts_all(
+                    uasg, include_inactive=include_inactive
+                )
+                if max_contracts is not None:
+                    records = records[:max_contracts]
+
+                entity: GovernmentEntity | None = None
+                if records:
+                    unit_name = (
+                        ComprasnetContratosConnector.extract_unit_name(records[0])
+                        or f"Unidade Gestora {uasg}"
+                    )
+                    entity = self._entity_by_uasg(
+                        str(uasg), unit_name, state, municipality, source
+                    )
+
+                for raw in records:
+                    stats.fetched += 1
+                    try:
+                        with self.db.begin_nested():
+                            _, is_new = self.upsert_comprasnet_contract(
+                                raw, source, run, entity=entity, uasg=str(uasg)
+                            )
+                            stats.inserted += int(is_new)
+                            stats.updated += int(not is_new)
+                    except Exception as exc:  # noqa: BLE001 - tolerante por registro
+                        stats.record_error(f"{raw.get('id', '?')}: {exc}")
+                        logger.warning("Erro ao ingerir contrato Comprasnet: %s", exc)
+                    if stats.fetched % 100 == 0:
+                        self.db.commit()
+                self.db.commit()
+
+            if stats.errors and (stats.inserted + stats.updated):
+                status = CollectionStatus.PARTIAL
+            elif stats.errors and not (stats.inserted + stats.updated):
+                status = CollectionStatus.FAILED
+        except Exception as exc:  # noqa: BLE001 - falha da fonte inteira
+            stats.record_error(str(exc))
+            status = CollectionStatus.FAILED
+            logger.exception("Execução Comprasnet falhou: %s", exc)
+        finally:
+            self._finish_run(run, stats, status)
+
+        return run

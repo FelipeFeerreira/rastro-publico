@@ -52,6 +52,25 @@ def normalize_document(value: str | None) -> str | None:
     return digits
 
 
+def normalize_document_type(value: str | None) -> str | None:
+    """Padroniza o tipo de pessoa entre fontes (PJ/PF/PE).
+
+    O PNCP usa `PJ`/`PF`/`PE`; o Comprasnet usa `JURIDICA`/`FISICA`/`ESTRANGEIRA`.
+    """
+    if not value:
+        return None
+    text = value.strip().upper()
+    if text in ("PJ", "PF", "PE"):
+        return text
+    if text.startswith("JURID"):
+        return "PJ"
+    if text.startswith("FIS") or text.startswith("FÍS"):
+        return "PF"
+    if text.startswith("ESTRANG") or text.startswith("ESTRANJ"):
+        return "PE"
+    return text[:4] or None
+
+
 def parse_decimal(value: object) -> Decimal | None:
     """Converte números vindos de JSON ou strings BR (R$ 1.234,56)."""
     if value is None or value == "":

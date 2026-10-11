@@ -53,6 +53,9 @@ class GovernmentEntity(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     cnpj: Mapped[str | None] = mapped_column(String(14), index=True)
+    # Unidade Gestora (UASG) para identificar campus/unidades administrativas
+    # que compartilham o mesmo CNPJ institucional (ex.: IFSP Campus Salto).
+    uasg: Mapped[str | None] = mapped_column(String(20), unique=True)
     name: Mapped[str] = mapped_column(String(300), nullable=False)
     acronym: Mapped[str | None] = mapped_column(String(50))
     sphere: Mapped[GovernmentSphere] = mapped_column(

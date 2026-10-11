@@ -128,12 +128,20 @@ python -m app.cli ingest pncp --data-inicial 2026-01-01 --data-final 2026-01-31 
 python -m app.cli ingest pncp --data-inicial 2026-01-05 --data-final 2026-01-05 \
   --com-itens --max-paginas 1
 
-# Contratos
+# Contratos (PNCP)
 python -m app.cli contracts --data-inicial 2026-01-01 --data-final 2026-01-31
+
+# Contratos federais do Comprasnet por unidade gestora (UASG)
+# Ex.: IFSP Campus Salto — UASG 158364, Salto/SP (IBGE 3545209)
+python -m app.cli comprasnet --uasg 158364 \
+  --municipio 3545209 --nome-municipio Salto --uf SP
 
 # Executar motor de auditoria
 python -m app.cli audit --limit 200
 ```
+
+> A importação do Comprasnet é idempotente (reimportar atualiza, não duplica) e
+> valida a UASG de cada registro, evitando atribuir contratos de outros campi.
 
 > A coleta é **incremental**: registros já existentes são atualizados, não duplicados.
 > Cada execução gera um `collection_run` com contadores e log de erros.

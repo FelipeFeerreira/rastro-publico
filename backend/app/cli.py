@@ -73,6 +73,23 @@ def cmd_contracts(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_comprasnet(args: argparse.Namespace) -> None:
+    with session_scope() as db:
+        run = IngestionService(db).ingest_comprasnet_contracts(
+            args.uasg,
+            include_inactive=not args.sem_inativos,
+            municipality_ibge=args.municipio,
+            municipality_name=args.nome_municipio,
+            uf=args.uf,
+            max_contracts=args.max,
+        )
+    print(
+        f"Execução #{run.id} [{run.status.value}] UASG {args.uasg} "
+        f"coletados={run.records_fetched} inseridos={run.records_inserted} "
+        f"atualizados={run.records_updated} erros={run.error_count}"
+    )
+
+
 def cmd_audit(args: argparse.Namespace) -> None:
     with session_scope() as db:
         created = AuditEngine(db).run_scan(limit=args.limit)
@@ -84,12 +101,21 @@ def cmd_stats(_: argparse.Namespace) -> None:
         def count(model) -> int:
             return int(db.scalar(select(func.count()).select_from(model)) or 0)
 
+        comprasnet_contracts = int(
+            db.scalar(
+                select(func.count())
+                .select_from(Contract)
+                .where(Contract.source_system == "comprasnet")
+            )
+            or 0
+        )
         print("Estatísticas da base local:")
-        print(f"  Contratações:       {count(Procurement)}")
-        print(f"  Resultados de item: {count(ProcurementResult)}")
-        print(f"  Contratos:          {count(Contract)}")
-        print(f"  Fornecedores:       {count(Supplier)}")
-        print(f"  Achados:            {count(AuditFinding)}")
+        print(f"  Contratações:          {count(Procurement)}")
+        print(f"  Resultados de item:    {count(ProcurementResult)}")
+        print(f"  Contratos:             {count(Contract)}")
+        print(f"  Contratos (Comprasnet):{comprasnet_contracts}")
+        print(f"  Fornecedores:          {count(Supplier)}")
+        print(f"  Achados:               {count(AuditFinding)}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -118,6 +144,17 @@ def build_parser() -> argparse.ArgumentParser:
     contracts.add_argument("--cnpj")
     contracts.add_argument("--max-paginas", type=int, default=None)
     contracts.set_defaults(func=cmd_contracts)
+
+    comprasnet = sub.add_parser(
+        "comprasnet", help="Importa contratos do Comprasnet por unidade gestora (UASG)"
+    )
+    comprasnet.add_argument("--uasg", required=True, help="Código da unidade gestora (ex.: 158364)")
+    comprasnet.add_argument("--sem-inativos", action="store_true", help="Não importar inativos")
+    comprasnet.add_argument("--municipio", help="Código IBGE do município (ex.: 3545209)")
+    comprasnet.add_argument("--nome-municipio", help="Nome do município (ex.: Salto)")
+    comprasnet.add_argument("--uf", help="UF da unidade (ex.: SP)")
+    comprasnet.add_argument("--max", type=int, default=None, help="Limite de contratos processados")
+    comprasnet.set_defaults(func=cmd_comprasnet)
 
     audit = sub.add_parser("audit", help="Executa o motor de auditoria")
     audit.add_argument("--limit", type=int, default=500)

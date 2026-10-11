@@ -30,12 +30,15 @@ def list_entities(
     q: str | None = None,
     uf: str | None = None,
     sphere: str | None = None,
+    uasg: str | None = Query(default=None, description="Unidade gestora (UASG)"),
 ) -> Page[EntitySummary]:
     stmt = select(GovernmentEntity)
     count_stmt = select(func.count()).select_from(GovernmentEntity)
     filters = []
     if q:
         filters.append(GovernmentEntity.name.ilike(f"%{q}%"))
+    if uasg:
+        filters.append(GovernmentEntity.uasg == uasg)
     if uf:
         filters.append(
             GovernmentEntity.state_id.in_(select(State.id).where(State.uf == uf.upper()))
