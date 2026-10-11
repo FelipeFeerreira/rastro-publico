@@ -188,6 +188,62 @@ Estado exposto pela API: `GET /api/v1/salarios/fontes`.
 
 ---
 
+## 8. Despesas municipais — TCE-SP ✅ integrado (Salto/SP)
+
+- **Documentação:** https://transparencia.tce.sp.gov.br/apis
+- **Conjunto de dados:** https://transparencia.tce.sp.gov.br/conjunto-de-dados
+- **Autenticação:** não exigida.
+- **Rota:** `GET /api/json/despesas/{municipio}/{exercicio}/{mes}` (também `xml`).
+  - `municipio` = slug (ex.: `salto`), listado em `GET /api/json/municipios`.
+  - `mes` = 1–12. Sem paginação (lista completa do mês).
+
+### Cobertura — verificada por execução
+
+A documentação cita exercício **2014–2019**, mas a API **respondeu com dados reais
+de 2019 a 2026** na verificação. Não presumimos cobertura: testamos cada ano.
+
+### Campos por evento
+
+`orgao`, `mes`, `evento`, `nr_empenho`, `id_fornecedor`, `nm_fornecedor`,
+`dt_emissao_despesa`, `vl_despesa`. Cada linha é um **evento** de despesa, **não**
+um contrato — não criamos vínculo com contratos.
+
+### Estágios e cancelamentos
+
+`Empenhado` → empenhado · `Valor Liquidado` → liquidado · `Valor Pago` → pago ·
+`Anulação` → anulação · `Reforço` → reforço. O valor **empenhado líquido** é
+`empenhado + reforço − anulação`. Estágios nunca são somados como se fossem o
+mesmo (evita contagem dupla).
+
+### Importação
+
+```bash
+python -m app.cli tce-sp-despesas --municipio salto --ibge 3545209 --uf SP \
+  --nome-municipio Salto --ano 2025 --mes-inicio 1 --mes-fim 12
+```
+
+### Resultado real (Salto/SP, 2026-10-11)
+
+- **2025:** 43.944 eventos — empenhado R$ 836.881.760,36 · liquidado R$ 725.785.937,96
+  · pago R$ 724.934.362,80 · anulação R$ 75.330.146,38.
+- **2026:** 28.279 eventos — empenhado R$ 763.877.890,47 · liquidado R$ 534.044.074,97
+  · pago R$ 526.748.797,56 · anulação R$ 57.807.546,91.
+- **Total 72.223 eventos**, 3 instituições (Prefeitura, Câmara, SAAE), ~1.666
+  fornecedores identificados por CNPJ.
+
+### Verificação
+
+```bash
+curl "http://localhost:8000/api/v1/despesas-municipais?municipio_ibge=3545209&ano=2025"
+curl "http://localhost:8000/api/v1/despesas-municipais/resumo?municipio_ibge=3545209&ano=2025"
+```
+
+> **Separação:** despesa municipal (TCE-SP) fica em tabela própria
+> (`municipal_expenses`), sem vínculo com contratos e separada da despesa federal
+> do IFSP Campus Salto.
+
+---
+
 ## Diretrizes de coleta
 
 1. **Verificar antes de implementar.** Confirmar documentação, autenticação, schema,

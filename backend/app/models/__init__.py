@@ -17,6 +17,7 @@ from app.models.enums import (  # noqa: F401
     GovernmentSphere,
     InvestigationStatus,
     ItemKind,
+    MunicipalExpenseStage,
     NotificationChannel,
     ProcurementModality,
     ProcurementStatus,
@@ -32,6 +33,7 @@ from app.models.investigation import (
     MonitoringSubscription,
     Notification,
 )
+from app.models.municipal import MunicipalExpense
 from app.models.person import PublicPerson, PublicPosition, Remuneration
 from app.models.procurement import (
     Contract,
@@ -58,6 +60,7 @@ __all__ = [
     "Investigation",
     "InvestigationEvidence",
     "MonitoringSubscription",
+    "MunicipalExpense",
     "Municipality",
     "Notification",
     "Payment",

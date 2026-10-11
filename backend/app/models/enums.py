@@ -103,6 +103,20 @@ class FinancialStage(StrEnum):
     PAGO = "pago"                  # efetivamente pago
 
 
+class MunicipalExpenseStage(StrEnum):
+    """Estágio de um evento de despesa municipal (TCE-SP).
+
+    Inclui eventos que não existem no estágio de contrato (reforço e anulação),
+    tratados separadamente para não inflar totais.
+    """
+
+    EMPENHADO = "empenhado"
+    LIQUIDADO = "liquidado"
+    PAGO = "pago"
+    REFORCO = "reforco"
+    ANULACAO = "anulacao"
+
+
 class FindingRule(StrEnum):
     """Regras de detecção de anomalias (indicadores para investigação)."""
 

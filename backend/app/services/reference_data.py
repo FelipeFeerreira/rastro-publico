@@ -65,6 +65,26 @@ DATA_SOURCES: list[dict] = [
         "status": SourceStatus.ACTIVE,
     },
     {
+        "code": "tce_sp",
+        "name": "TCE-SP — Portal da Transparência Municipal",
+        "description": (
+            "Despesas dos municípios jurisdicionados ao Tribunal de Contas do "
+            "Estado de São Paulo, por evento (empenhado, liquidado, pago, reforço "
+            "e anulação). Fonte municipal, separada das contratações federais."
+        ),
+        "homepage_url": "https://transparencia.tce.sp.gov.br/",
+        "api_documentation_url": "https://transparencia.tce.sp.gov.br/apis",
+        "license_name": "Dados Abertos Governamentais",
+        "license_url": "https://transparencia.tce.sp.gov.br/conjunto-de-dados",
+        "requires_authentication": False,
+        "coverage_description": (
+            "Municípios do Estado de São Paulo, por exercício e mês. A API pública "
+            "de despesas respondeu com dados de 2019 a 2026 durante a verificação "
+            "(a documentação cita 2014–2019, mas a fonte serve anos recentes)."
+        ),
+        "status": SourceStatus.ACTIVE,
+    },
+    {
         "code": "transparencia",
         "name": "Portal da Transparência do Governo Federal",
         "description": (

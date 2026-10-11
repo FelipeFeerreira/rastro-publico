@@ -115,6 +115,23 @@ def parse_date(value: object) -> date | None:
     return dt.date() if dt else None
 
 
+def parse_br_date(value: object) -> date | None:
+    """Aceita datas no formato brasileiro (dd/mm/aaaa) ou ISO."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    text = str(value).strip()
+    for fmt in ("%d/%m/%Y", "%d/%m/%y", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt).date()
+        except ValueError:
+            continue
+    return parse_date(text)
+
+
 _MODALITY_BY_CODE: dict[str, ProcurementModality] = {
     "1": ProcurementModality.LEILAO,
     "2": ProcurementModality.DIALOGO_COMPETITIVO,

@@ -147,6 +147,10 @@ python -m app.cli comprasnet --uasg 158364 \
 # Execução financeira (empenhado/liquidado/pago) dos contratos de uma UASG
 python -m app.cli comprasnet-pagamentos --uasg 158364
 
+# Despesas municipais (eventos) do TCE-SP — ex.: Salto/SP
+python -m app.cli tce-sp-despesas --municipio salto --ibge 3545209 --uf SP \
+  --nome-municipio Salto --ano 2025 --mes-inicio 1 --mes-fim 12
+
 # Remuneração de servidores federais (exige TRANSPARENCIA_API_KEY)
 python -m app.cli transparencia-servidores --orgao 26439 --mes 202501 \
   --campus "IFSP - CAMPUS SALTO"

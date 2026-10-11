@@ -17,6 +17,7 @@ from sqlalchemy import func, select
 from app.core.logging import configure_logging
 from app.db.session import session_scope
 from app.models.audit import AuditFinding
+from app.models.municipal import MunicipalExpense
 from app.models.procurement import Contract, Payment, Procurement, ProcurementResult
 from app.models.supplier import Supplier
 from app.services.analysis.engine import AuditEngine, ensure_rules
@@ -120,6 +121,26 @@ def cmd_servidores(args: argparse.Namespace) -> None:
         print("Observação:", run.message)
 
 
+def cmd_tce_sp_despesas(args: argparse.Namespace) -> None:
+    with session_scope() as db:
+        run = IngestionService(db).ingest_tce_sp_despesas(
+            args.municipio,
+            ibge_code=args.ibge,
+            uf=args.uf,
+            municipality_name=args.nome_municipio,
+            year=args.ano,
+            month_start=args.mes_inicio,
+            month_end=args.mes_fim,
+            max_records=args.max,
+        )
+    print(
+        f"Execução #{run.id} [{run.status.value}] TCE-SP {args.municipio}/{args.ano} "
+        f"meses {args.mes_inicio}-{args.mes_fim} registros={run.records_fetched} "
+        f"inseridos={run.records_inserted} atualizados={run.records_updated} "
+        f"ignorados={run.records_skipped} erros={run.error_count}"
+    )
+
+
 def cmd_audit(args: argparse.Namespace) -> None:
     with session_scope() as db:
         created = AuditEngine(db).run_scan(limit=args.limit)
@@ -145,6 +166,7 @@ def cmd_stats(_: argparse.Namespace) -> None:
         print(f"  Contratos:             {count(Contract)}")
         print(f"  Contratos (Comprasnet):{comprasnet_contracts}")
         print(f"  Pagamentos (estágios): {count(Payment)}")
+        print(f"  Despesas municipais:   {count(MunicipalExpense)}")
         print(f"  Fornecedores:          {count(Supplier)}")
         print(f"  Achados:               {count(AuditFinding)}")
 
@@ -204,6 +226,20 @@ def build_parser() -> argparse.ArgumentParser:
     servidores.add_argument("--campus", help="UORG do campus (ex.: 'IFSP - CAMPUS SALTO')")
     servidores.add_argument("--max", type=int, default=None, help="Limite de servidores")
     servidores.set_defaults(func=cmd_servidores)
+
+    tce = sub.add_parser(
+        "tce-sp-despesas",
+        help="Importa despesas municipais (eventos) do TCE-SP para um município/ano",
+    )
+    tce.add_argument("--municipio", required=True, help="Slug do município (ex.: salto)")
+    tce.add_argument("--ibge", required=True, help="Código IBGE (ex.: 3545209)")
+    tce.add_argument("--uf", required=True, help="UF (ex.: SP)")
+    tce.add_argument("--nome-municipio", help="Nome do município (ex.: Salto)")
+    tce.add_argument("--ano", type=int, required=True, help="Exercício (ex.: 2025)")
+    tce.add_argument("--mes-inicio", type=int, default=1)
+    tce.add_argument("--mes-fim", type=int, default=12)
+    tce.add_argument("--max", type=int, default=None, help="Limite de registros (bounded)")
+    tce.set_defaults(func=cmd_tce_sp_despesas)
 
     audit = sub.add_parser("audit", help="Executa o motor de auditoria")
     audit.add_argument("--limit", type=int, default=500)

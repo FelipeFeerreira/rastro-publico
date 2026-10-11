@@ -77,6 +77,9 @@ com busca funcional; API responde `/api/v1/health`; `pytest` e `vitest` verdes.
       1.233 lançamentos de empenho; estágios separados, sem contagem dupla.
 - [x] **Painel do campus** `/campus/{uasg}` (ex.: IFSP Salto) com totais, resumo
       financeiro, filtros por data/fornecedor/valor e seção de salários.
+- [x] **Despesas municipais reais (TCE-SP)** de Salto/SP em tabela própria,
+      separadas do federal: 72.223 eventos (2025–2026), com estágios
+      (empenhado/liquidado/pago/reforço/anulação) e API de leitura.
 - [x] **Busca de remuneração** (interface + API + ingestão) com verificação de campus
       por UORG; **integração bloqueada** sem `TRANSPARENCIA_API_KEY`.
 - [ ] Conector do Portal da Transparência efetivamente ativo (requer chave de API).

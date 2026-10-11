@@ -14,6 +14,7 @@ from app.api.v1 import (
     health,
     investigations,
     monitoring,
+    municipal_expenses,
     payments,
     procurements,
     salaries,
@@ -29,6 +30,7 @@ api_router.include_router(search.router)
 api_router.include_router(procurements.router)
 api_router.include_router(contracts.router)
 api_router.include_router(payments.router)
+api_router.include_router(municipal_expenses.router)
 api_router.include_router(salaries.router)
 api_router.include_router(suppliers.router)
 api_router.include_router(entities.router)

@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.connectors.comprasnet import ComprasnetContratosConnector
 from app.connectors.pncp import PNCPConnector
+from app.connectors.tce_sp import TceSpConnector
 from app.connectors.transparencia import TRANSPARENCIA_BASE_URL, TransparenciaConnector
 from app.core.logging import get_logger
 from app.db.base import utcnow
@@ -27,6 +28,7 @@ from app.models.enums import (
     SourceStatus,
 )
 from app.models.geo import GovernmentEntity, Municipality, State
+from app.models.municipal import MunicipalExpense
 from app.models.person import PublicPerson, Remuneration
 from app.models.procurement import (
     Contract,
@@ -1097,6 +1099,186 @@ class IngestionService:
             stats.record_error(str(exc))
             status = CollectionStatus.FAILED
             logger.exception("Execução de servidores do Portal da Transparência falhou: %s", exc)
+        finally:
+            self._finish_run(run, stats, status)
+
+        return run
+
+    # ------------------------------------------------------------------ #
+    # TCE-SP — despesas municipais (eventos financeiros)
+    # ------------------------------------------------------------------ #
+    def _municipal_institution(
+        self,
+        name: str,
+        municipality: Municipality,
+        state: State | None,
+        source: DataSource,
+    ) -> GovernmentEntity | None:
+        """Instituição municipal responsável (Prefeitura, Câmara, autarquia)."""
+        name = (name or "").strip()
+        if not name:
+            return None
+        entity = self.db.scalar(
+            select(GovernmentEntity).where(
+                GovernmentEntity.name == name,
+                GovernmentEntity.municipality_id == municipality.id,
+            )
+        )
+        if entity is None:
+            upper = name.upper()
+            power = (
+                GovernmentPower.LEGISLATIVE
+                if "CÂMARA" in upper or "CAMARA" in upper
+                else GovernmentPower.EXECUTIVE
+            )
+            entity = GovernmentEntity(
+                name=name,
+                sphere=GovernmentSphere.MUNICIPAL,
+                power=power,
+                state_id=state.id if state else None,
+                municipality_id=municipality.id,
+                source_id=source.id,
+                search_text=norm.build_search_text(name, municipality.name),
+            )
+            self.db.add(entity)
+            self.db.flush()
+        return entity
+
+    def _upsert_municipal_expense(
+        self,
+        raw: dict[str, Any],
+        *,
+        source: DataSource,
+        municipality: Municipality,
+        state: State | None,
+        ano: int,
+        mes: int,
+        municipio_slug: str,
+    ) -> bool:
+        stage = TceSpConnector.map_stage(raw.get("evento"))
+        if stage is None:
+            raise ValueError(f"evento desconhecido: {raw.get('evento')!r}")
+
+        key = TceSpConnector.build_external_key(raw)
+        existing = self.db.scalar(
+            select(MunicipalExpense).where(
+                MunicipalExpense.source_id == source.id,
+                MunicipalExpense.external_key == key,
+            )
+        )
+
+        # Resolve entidade/fornecedor ANTES de criar a despesa: esses helpers
+        # podem emitir flush e não devem inserir uma linha ainda incompleta.
+        entity = self._municipal_institution(raw.get("orgao") or "", municipality, state, source)
+        tipo, document = TceSpConnector.parse_supplier(raw.get("id_fornecedor"))
+        supplier = self._supplier(document, raw.get("nm_fornecedor"), tipo)
+
+        is_new = existing is None
+        expense = existing or MunicipalExpense(source_id=source.id, external_key=key)
+        if is_new:
+            self.db.add(expense)
+
+        expense.municipality_id = municipality.id
+        expense.entity_id = entity.id if entity else None
+        expense.supplier_id = supplier.id if supplier else None
+        expense.supplier_name = raw.get("nm_fornecedor")
+        expense.supplier_document = document
+        expense.supplier_raw_id = raw.get("id_fornecedor")
+        expense.empenho_number = raw.get("nr_empenho")
+        expense.stage = stage
+        expense.value = norm.parse_decimal(raw.get("vl_despesa"))
+        expense.event_year = ano
+        expense.event_month = mes
+        expense.month_name = raw.get("mes")
+        expense.event_date = norm.parse_br_date(raw.get("dt_emissao_despesa"))
+        expense.source_url = TceSpConnector.source_url(municipio_slug, ano, mes)
+        expense.collected_at = utcnow()
+        self.db.flush()
+        return is_new
+
+    def ingest_tce_sp_despesas(
+        self,
+        municipio: str,
+        *,
+        ibge_code: str,
+        uf: str,
+        municipality_name: str | None = None,
+        year: int,
+        month_start: int = 1,
+        month_end: int = 12,
+        max_records: int | None = None,
+    ) -> CollectionRun:
+        """Importa despesas municipais (eventos) do TCE-SP para um período.
+
+        Separado das contratações/pagamentos federais. Idempotente por evento.
+        """
+        source = get_source(self.db, "tce_sp")
+        run = self._start_run(
+            source,
+            scope=f"tce_sp/despesas/{municipio}/{year}",
+            params={
+                "municipio": municipio,
+                "ibge": ibge_code,
+                "ano": year,
+                "mes_inicio": month_start,
+                "mes_fim": month_end,
+            },
+        )
+        stats = IngestionStats()
+        status = CollectionStatus.SUCCESS
+
+        state = self._state(uf, None) if uf else None
+        municipality = self._municipality(
+            ibge_code, municipality_name or municipio.replace("-", " ").title(), state
+        )
+        if municipality is None:
+            stats.record_error("Município não resolvido (UF ausente ou IBGE inválido).")
+            self._finish_run(run, stats, CollectionStatus.FAILED)
+            return run
+
+        try:
+            with TceSpConnector() as connector:
+                stop = False
+                for mes in range(month_start, month_end + 1):
+                    try:
+                        records = connector.fetch_despesas(municipio, year, mes)
+                    except Exception as exc:  # noqa: BLE001 - falha por mês
+                        stats.record_error(f"{year}-{mes:02d}: {exc}")
+                        continue
+                    for raw in records:
+                        if max_records is not None and stats.fetched >= max_records:
+                            stop = True
+                            break
+                        stats.fetched += 1
+                        try:
+                            with self.db.begin_nested():
+                                is_new = self._upsert_municipal_expense(
+                                    raw,
+                                    source=source,
+                                    municipality=municipality,
+                                    state=state,
+                                    ano=year,
+                                    mes=mes,
+                                    municipio_slug=municipio,
+                                )
+                                stats.inserted += int(is_new)
+                                stats.updated += int(not is_new)
+                        except ValueError:
+                            stats.skipped += 1
+                        except Exception as exc:  # noqa: BLE001
+                            stats.record_error(f"{raw.get('nr_empenho', '?')}: {exc}")
+                    self.db.commit()
+                    if stop:
+                        break
+
+            if stats.errors and (stats.inserted + stats.updated):
+                status = CollectionStatus.PARTIAL
+            elif stats.errors and not (stats.inserted + stats.updated):
+                status = CollectionStatus.FAILED
+        except Exception as exc:  # noqa: BLE001 - falha da fonte inteira
+            stats.record_error(str(exc))
+            status = CollectionStatus.FAILED
+            logger.exception("Execução TCE-SP falhou: %s", exc)
         finally:
             self._finish_run(run, stats, status)
 

@@ -109,6 +109,18 @@ Os lançamentos vêm dos **empenhos** do Comprasnet. As **faturas** não são pe
 como pagamento: elas documentam a liquidação já agregada no empenho e somá-las contaria
 o mesmo dinheiro duas vezes.
 
+## Despesas municipais (TCE-SP)
+
+Somente leitura. Registros municipais, **separados** das contratações federais.
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/despesas-municipais?municipio_ibge=&ano=&mes=&entity_id=&supplier_id=&supplier_name=&stage=&page=` | Lista eventos |
+| GET | `/despesas-municipais/resumo?municipio_ibge=&ano=&mes=&entity_id=&supplier_id=&supplier_name=` | Totais por estágio |
+
+`stage` ∈ `empenhado` \| `liquidado` \| `pago` \| `reforco` \| `anulacao`.
+O resumo retorna `committed_net = empenhado + reforço − anulação`.
+
 ## Servidores e remuneração
 
 | Método | Rota | Descrição |
