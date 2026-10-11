@@ -224,3 +224,71 @@ def test_municipal_kept_separate_from_federal(db):
     entity = db.scalar(select(GovernmentEntity))
     assert entity.sphere.value == "municipal"
     assert entity.uasg is None
+
+
+@respx.mock
+def test_summary_coverage_flags_partial_year(db, client):
+    _mock_month([make_despesa(evento="Empenhado", nr_empenho="1-2025", dt_emissao_despesa="10/01/2025")], ano=2025, mes=1)
+    _mock_month([make_despesa(evento="Empenhado", nr_empenho="1-2026", dt_emissao_despesa="10/01/2026")], ano=2026, mes=1)
+    service = IngestionService(db)
+    service.ingest_tce_sp_despesas("salto", year=2025, month_start=1, month_end=1, **SALTO_ARGS)
+    service.ingest_tce_sp_despesas("salto", year=2026, month_start=1, month_end=1, **SALTO_ARGS)
+
+    resumo = client.get("/api/v1/despesas-municipais/resumo", params={"municipio_ibge": "3545209"})
+    cov = resumo.json()["coverage"]
+    assert set(cov["months_by_year"].keys()) == {"2025", "2026"}
+    assert cov["months_by_year"]["2025"] == [1]
+    # Ambos os anos têm menos de 12 meses => cobertura parcial explícita.
+    assert set(cov["partial_years"]) == {2025, 2026}, cov
+    assert cov["first_date"] is not None and cov["last_date"] is not None
+    assert cov["last_collected_at"] is not None
+
+
+@respx.mock
+def test_institutions_breakdown_separates_stages(db, client):
+    _mock_month(
+        [
+            make_despesa(orgao="PREFEITURA MUNICIPAL DE SALTO", evento="Empenhado", vl_despesa="1.000,00"),
+            make_despesa(orgao="CÂMARA MUNICIPAL DE SALTO", evento="Empenhado", nr_empenho="9-2025", vl_despesa="300,00"),
+            make_despesa(orgao="SERVICO AUTONOMO DE AGUA E ESGOTO DE SALTO - SAAE SALTO", evento="Valor Pago", nr_empenho="7-2025", vl_despesa="200,00"),
+        ]
+    )
+    IngestionService(db).ingest_tce_sp_despesas(
+        "salto", year=2025, month_start=1, month_end=1, **SALTO_ARGS
+    )
+
+    resp = client.get("/api/v1/despesas-municipais/instituicoes", params={"municipio_ibge": "3545209"})
+    assert resp.status_code == 200
+    items = resp.json()
+    assert len(items) == 3
+    by_name = {i["entity_name"]: i for i in items}
+    assert float(by_name["PREFEITURA MUNICIPAL DE SALTO"]["empenhado"]) == 1000.0
+    assert float(by_name["CÂMARA MUNICIPAL DE SALTO"]["empenhado"]) == 300.0
+    assert float(by_name["SERVICO AUTONOMO DE AGUA E ESGOTO DE SALTO - SAAE SALTO"]["pago"]) == 200.0
+    # Ordenado por pago (maior primeiro): SAAE fica à frente.
+    assert items[0]["entity_name"].startswith("SERVICO AUTONOMO")
+
+
+@respx.mock
+def test_individual_cpf_is_not_stored_or_exposed(db, client):
+    _mock_month(
+        [
+            make_despesa(
+                id_fornecedor="CPF - PESSOA FÍSICA - 123456",
+                nm_fornecedor="MARIA DA SILVA",
+                evento="Valor Pago",
+                vl_despesa="150,00",
+            )
+        ]
+    )
+    IngestionService(db).ingest_tce_sp_despesas(
+        "salto", year=2025, month_start=1, month_end=1, **SALTO_ARGS
+    )
+    expense = db.scalar(select(MunicipalExpense))
+    assert expense.supplier_document is None
+    assert expense.supplier_id is None
+    assert expense.supplier_name == "MARIA DA SILVA"
+
+    rows = client.get("/api/v1/despesas-municipais", params={"municipio_ibge": "3545209"}).json()
+    assert rows["items"][0]["supplier_document"] is None
+    assert rows["items"][0]["supplier_name"] == "MARIA DA SILVA"

@@ -104,9 +104,17 @@ class TceSpConnector(BaseConnector):
         return tipo, document
 
     @staticmethod
-    def build_external_key(raw: dict[str, Any]) -> str:
-        """Chave natural determinística do evento (para idempotência)."""
+    def build_external_key(
+        raw: dict[str, Any], *, ano: int | str | None = None, municipio: str | None = None
+    ) -> str:
+        """Chave natural determinística do evento (para idempotência).
+
+        Inclui o exercício e o município: a mesma linha de evento em anos
+        diferentes não pode colidir (o `mes` é só o nome do mês).
+        """
         parts = [
+            str(municipio or ""),
+            str(ano or ""),
             str(raw.get("orgao") or ""),
             str(raw.get("mes") or ""),
             str(raw.get("evento") or ""),

@@ -10,6 +10,9 @@ import type {
   Evidence,
   Finding,
   Investigation,
+  MunicipalExpense,
+  MunicipalExpenseTotals,
+  MunicipalInstitutionTotals,
   Municipality,
   Page,
   Payment,
@@ -209,6 +212,19 @@ export function listPayments(params: Record<string, string | number | undefined>
 
 export function getContractPayments(contractId: string | number) {
   return apiFetch<Payment[]>(`/contratos/${contractId}/pagamentos`);
+}
+
+// --- Despesas municipais (TCE-SP) ---
+export function listMunicipalExpenses(params: Record<string, string | number | undefined>) {
+  return apiFetch<Page<MunicipalExpense>>(`/despesas-municipais${qs(params)}`);
+}
+
+export function getMunicipalSummary(params: Record<string, string | number | undefined>) {
+  return apiFetch<MunicipalExpenseTotals>(`/despesas-municipais/resumo${qs(params)}`);
+}
+
+export function listMunicipalInstitutions(params: Record<string, string | number | undefined>) {
+  return apiFetch<MunicipalInstitutionTotals[]>(`/despesas-municipais/instituicoes${qs(params)}`);
 }
 
 // --- Servidores e remuneração ---

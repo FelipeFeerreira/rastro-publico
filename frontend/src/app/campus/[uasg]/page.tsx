@@ -213,8 +213,8 @@ export default async function CampusPage({
           Este painel é da unidade <strong>federal</strong> (IFSP). A Prefeitura de Salto é
           uma instituição <strong>municipal</strong>, com orçamento e portal próprios — um
           conjunto de dados separado.{" "}
-          <Link href="/municipios/3545209" className="text-primary underline">
-            Ver o município de Salto
+          <Link href="/municipios/3545209/despesas" className="text-primary underline">
+            Ver as despesas municipais de Salto
           </Link>
           .
         </DataNotice>

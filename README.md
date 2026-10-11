@@ -43,6 +43,16 @@ O Rastro Público oferece duas experiências integradas:
 A primeira integração real é o **Portal Nacional de Contratações Públicas (PNCP)**,
 cobrindo contratações sob a Lei 14.133/2021 de União, estados e municípios.
 
+### Painel municipal
+
+Há um painel de despesas municipais em `/municipios/3545209/despesas`
+(**Salto/SP**), com fonte TCE-SP: quanto a Prefeitura, a Câmara e o SAAE
+**realmente pagaram**, além de empenhado, liquidado e anulado (sempre separados,
+nunca somados entre si), com filtros por ano, mês, instituição, fornecedor e
+estágio. O **pago** é a métrica principal. Cobertura parcial é exibida
+explicitamente (ex.: 2026: jan–ago). Despesa municipal é mantida separada da
+despesa federal do IFSP Campus Salto.
+
 ### Painel de campus
 
 Há um painel dedicado por unidade gestora (UASG) em `/campus/{uasg}` — por exemplo

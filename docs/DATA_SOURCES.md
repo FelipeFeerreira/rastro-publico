@@ -222,6 +222,14 @@ python -m app.cli tce-sp-despesas --municipio salto --ibge 3545209 --uf SP \
   --nome-municipio Salto --ano 2025 --mes-inicio 1 --mes-fim 12
 ```
 
+### Painel e cobertura
+
+O painel `/municipios/3545209/despesas` exibe o pago como métrica principal, os
+estágios separados, os gastos por instituição (Prefeitura/Câmara/SAAE) e a
+cobertura por ano. **2026 é parcial (jan–ago)**: a fonte não publicou os meses
+seguintes; o painel avisa isso explicitamente e nunca trata meses futuros como
+concluídos.
+
 ### Resultado real (Salto/SP, 2026-10-11)
 
 - **2025:** 43.944 eventos — empenhado R$ 836.881.760,36 · liquidado R$ 725.785.937,96

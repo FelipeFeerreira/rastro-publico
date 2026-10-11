@@ -1159,7 +1159,7 @@ class IngestionService:
         if stage is None:
             raise ValueError(f"evento desconhecido: {raw.get('evento')!r}")
 
-        key = TceSpConnector.build_external_key(raw)
+        key = TceSpConnector.build_external_key(raw, ano=ano, municipio=municipio_slug)
         existing = self.db.scalar(
             select(MunicipalExpense).where(
                 MunicipalExpense.source_id == source.id,
@@ -1171,7 +1171,10 @@ class IngestionService:
         # podem emitir flush e não devem inserir uma linha ainda incompleta.
         entity = self._municipal_institution(raw.get("orgao") or "", municipality, state, source)
         tipo, document = TceSpConnector.parse_supplier(raw.get("id_fornecedor"))
-        supplier = self._supplier(document, raw.get("nm_fornecedor"), tipo)
+        # Privacidade (LGPD): só persistimos/ligamos CNPJ (14 dígitos). CPF de
+        # pessoa física nunca é armazenado nem exposto; mantemos apenas o nome.
+        supplier_doc = document if document and len(document) == 14 else None
+        supplier = self._supplier(supplier_doc, raw.get("nm_fornecedor"), tipo)
 
         is_new = existing is None
         expense = existing or MunicipalExpense(source_id=source.id, external_key=key)
@@ -1182,7 +1185,7 @@ class IngestionService:
         expense.entity_id = entity.id if entity else None
         expense.supplier_id = supplier.id if supplier else None
         expense.supplier_name = raw.get("nm_fornecedor")
-        expense.supplier_document = document
+        expense.supplier_document = supplier_doc
         expense.supplier_raw_id = raw.get("id_fornecedor")
         expense.empenho_number = raw.get("nr_empenho")
         expense.stage = stage

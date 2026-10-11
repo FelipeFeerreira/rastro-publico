@@ -116,10 +116,15 @@ Somente leitura. Registros municipais, **separados** das contratações federais
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/despesas-municipais?municipio_ibge=&ano=&mes=&entity_id=&supplier_id=&supplier_name=&stage=&page=` | Lista eventos |
-| GET | `/despesas-municipais/resumo?municipio_ibge=&ano=&mes=&entity_id=&supplier_id=&supplier_name=` | Totais por estágio |
+| GET | `/despesas-municipais/resumo?municipio_ibge=&ano=&mes=&entity_id=&supplier_id=&supplier_name=` | Totais por estágio + cobertura |
+| GET | `/despesas-municipais/instituicoes?municipio_ibge=&ano=&mes=` | Totais por instituição |
 
 `stage` ∈ `empenhado` \| `liquidado` \| `pago` \| `reforco` \| `anulacao`.
-O resumo retorna `committed_net = empenhado + reforço − anulação`.
+O resumo retorna `committed_net = empenhado + reforço − anulação` e um objeto
+`coverage` com `first_date`, `last_date`, `last_collected_at`,
+`months_by_year` (ex.: `{"2025":[1..12],"2026":[1..8]}`) e `partial_years`
+(anos com menos de 12 meses). Documentos de pessoa física (CPF) nunca são expostos —
+apenas CNPJ (14 dígitos).
 
 ## Servidores e remuneração
 

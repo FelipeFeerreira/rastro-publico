@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DataNotice, EmptyState, SectionHeading, StatCard } from "@/components/common";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ApiError, getMunicipality, listProcurements } from "@/lib/api";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/format";
@@ -22,14 +23,23 @@ export default async function MunicipalityPage({ params }: { params: Promise<{ i
 
   return (
     <div className="container py-10">
-      <h1 className="text-3xl font-semibold tracking-tight">
-        {municipality.name}
-        {municipality.uf ? `/${municipality.uf}` : ""}
-      </h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Código IBGE {municipality.ibge_code}
-        {municipality.state_name ? ` · ${municipality.state_name}` : ""}
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            {municipality.name}
+            {municipality.uf ? `/${municipality.uf}` : ""}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Código IBGE {municipality.ibge_code}
+            {municipality.state_name ? ` · ${municipality.state_name}` : ""}
+          </p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href={`/municipios/${municipality.ibge_code}/despesas`}>
+            Ver despesas públicas (Prefeitura, Câmara, SAAE)
+          </Link>
+        </Button>
+      </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <StatCard label="Contratações" value={formatNumber(municipality.procurement_count)} />

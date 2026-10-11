@@ -191,6 +191,57 @@ export interface CampusDashboard {
   notes: string[];
 }
 
+export interface MunicipalExpense {
+  id: number;
+  municipality_id: number;
+  entity_id: number | null;
+  entity_name: string | null;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  supplier_document: string | null;
+  empenho_number: string | null;
+  stage: string;
+  value: number | string | null;
+  event_year: number | null;
+  event_month: number | null;
+  month_name: string | null;
+  event_date: string | null;
+  description: string | null;
+  source_url: string | null;
+  collected_at: string | null;
+}
+
+export interface MunicipalCoverage {
+  first_date: string | null;
+  last_date: string | null;
+  last_collected_at: string | null;
+  months_by_year: Record<string, number[]>;
+  partial_years: number[];
+}
+
+export interface MunicipalExpenseTotals {
+  records: number;
+  empenhado: number | string;
+  liquidado: number | string;
+  pago: number | string;
+  reforco: number | string;
+  anulacao: number | string;
+  committed_net: number | string;
+  coverage: MunicipalCoverage | null;
+}
+
+export interface MunicipalInstitutionTotals {
+  entity_id: number | null;
+  entity_name: string | null;
+  records: number;
+  empenhado: number | string;
+  liquidado: number | string;
+  pago: number | string;
+  reforco: number | string;
+  anulacao: number | string;
+  committed_net: number | string;
+}
+
 export interface Remuneration {
   id: number;
   reference_year: number | null;

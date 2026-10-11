@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Coins,
   FileSearch,
   Landmark,
   LineChart,
@@ -134,32 +135,61 @@ export default async function HomePage() {
       </section>
 
       <section className="container pb-4">
-        <Link href="/campus/158364" className="group block">
-          <Card className="border-primary/30 bg-primary/5 transition-colors hover:border-primary/60">
-            <CardContent className="flex flex-col items-start justify-between gap-4 p-6 md:flex-row md:items-center">
-              <div className="flex items-start gap-4">
-                <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Landmark className="size-5" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Link href="/municipios/3545209/despesas" className="group block">
+            <Card className="h-full border-primary/30 bg-primary/5 transition-colors hover:border-primary/60">
+              <CardContent className="flex h-full flex-col items-start justify-between gap-4 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Coins className="size-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-primary">
+                      Painel em destaque
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight">
+                      Salto — Despesas municipais
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Quanto a Prefeitura, a Câmara e o SAAE realmente pagaram, com
+                      fornecedores e datas. Fonte: TCE-SP.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-primary">
-                    Painel em destaque
-                  </p>
-                  <h2 className="mt-1 text-lg font-semibold tracking-tight">
-                    IFSP — Campus Salto
-                  </h2>
-                  <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                    Quanto o campus contratou e quanto realmente pagou, com fornecedores,
-                    datas e valores. Unidade federal, em Salto/SP.
-                  </p>
+                <Button variant="default" className="shrink-0">
+                  Abrir painel <ArrowRight className="size-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/campus/158364" className="group block">
+            <Card className="h-full border-border/60 transition-colors hover:border-primary/60">
+              <CardContent className="flex h-full flex-col items-start justify-between gap-4 p-6">
+                <div className="flex items-start gap-4">
+                  <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Landmark className="size-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-primary">
+                      Painel em destaque
+                    </p>
+                    <h2 className="mt-1 text-lg font-semibold tracking-tight">
+                      IFSP — Campus Salto
+                    </h2>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Quanto o campus contratou e quanto realmente pagou. Unidade federal,
+                      separada da despesa municipal.
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <Button variant="default" className="shrink-0">
-                Abrir painel <ArrowRight className="size-4" />
-              </Button>
-            </CardContent>
-          </Card>
-        </Link>
+                <Button variant="outline" className="shrink-0">
+                  Abrir painel <ArrowRight className="size-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
       </section>
 
       <section className="border-y bg-muted/30 py-14">
