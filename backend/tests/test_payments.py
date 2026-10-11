@@ -1,7 +1,8 @@
-"""Testes de execução financeira (empenhos/faturas) do Comprasnet.
+"""Testes de execução financeira (empenhos) do Comprasnet.
 
 Garantem que valor contratado NÃO é exibido como pago, que estágios ficam
-separados, que a importação é idempotente e que a API filtra por UASG.
+separados, que a importação é idempotente e que as faturas (que documentam a
+liquidação já agregada no empenho) NÃO são somadas para evitar contagem dupla.
 """
 
 from __future__ import annotations
@@ -17,7 +18,9 @@ from tests.test_comprasnet import BASE, SALTO_ARGS, SALTO_UASG, _mock_unit, make
 CONTRACT_ID = 83385
 
 
-def make_empenho(emp_id: int, *, pago="1.567,43", liquidado="0,00", empenhado="1.567,43") -> dict:
+def make_empenho(
+    emp_id: int, *, pago=None, liquidado=None, empenhado=None
+) -> dict:
     return {
         "id": emp_id,
         "unidade_gestora": SALTO_UASG,
@@ -40,35 +43,17 @@ def make_empenho(emp_id: int, *, pago="1.567,43", liquidado="0,00", empenhado="1
     }
 
 
-def make_fatura(fat_id: int, *, liquidacao="2024-08-01", valor="474,31") -> dict:
-    return {
-        "id": fat_id,
-        "numero": "1876723",
-        "tipo_instrumento_cobranca": "Nota Fiscal",
-        "fornecedor_contrato": "09.177.971/0001-86",
-        "emissao": "2024-07-05",
-        "vencimento": "2024-07-19",
-        "valor": valor,
-        "valorliquido": valor,
-        "data_liquidacao": liquidacao,
-    }
-
-
-def _mock_contract_and_financials(empenhos, faturas):
+def _mock_contract_and_empenhos(empenhos):
     _mock_unit([make_record(CONTRACT_ID)], [])
     respx.get(f"{BASE}/api/contrato/{CONTRACT_ID}/empenhos").mock(
         return_value=httpx.Response(200, json=empenhos)
-    )
-    respx.get(f"{BASE}/api/contrato/{CONTRACT_ID}/faturas").mock(
-        return_value=httpx.Response(200, json=faturas)
     )
 
 
 @respx.mock
 def test_imports_stages_separately(db):
-    _mock_contract_and_financials(
-        [make_empenho(10145339, empenhado="1.567,43", liquidado="1.000,00", pago="500,00")],
-        [],
+    _mock_contract_and_empenhos(
+        [make_empenho(10145339, empenhado="1.567,43", liquidado="1.000,00", pago="500,00")]
     )
     service = IngestionService(db)
     service.ingest_comprasnet_contracts(SALTO_UASG, **SALTO_ARGS)
@@ -83,12 +68,20 @@ def test_imports_stages_separately(db):
 
 
 @respx.mock
+def test_only_empenho_events_are_stored(db):
+    """Faturas não entram como pagamento (a liquidação já está no empenho)."""
+    _mock_contract_and_empenhos([make_empenho(1, empenhado="1.000,00", pago="1.000,00")])
+    service = IngestionService(db)
+    service.ingest_comprasnet_contracts(SALTO_UASG, **SALTO_ARGS)
+    service.ingest_comprasnet_payments(SALTO_UASG)
+    payments = list(db.scalars(select(Payment)))
+    assert payments  # há lançamentos
+    assert all((p.external_id or "").startswith("empenho:") for p in payments)
+
+
+@respx.mock
 def test_contracted_value_is_not_paid(db):
-    """O valor global do contrato não pode aparecer como pago."""
-    _mock_contract_and_financials(
-        [make_empenho(1, empenhado="1.000,00", liquidado="0,00", pago="0,00")],
-        [],
-    )
+    _mock_contract_and_empenhos([make_empenho(1, empenhado="1.000,00", liquidado="0,00", pago="0,00")])
     service = IngestionService(db)
     service.ingest_comprasnet_contracts(SALTO_UASG, **SALTO_ARGS)
     service.ingest_comprasnet_payments(SALTO_UASG)
@@ -102,8 +95,8 @@ def test_contracted_value_is_not_paid(db):
 
 
 @respx.mock
-def test_pending_invoice_is_not_imported_as_payment(db):
-    _mock_contract_and_financials([], [make_fatura(346512, liquidacao=None)])
+def test_missing_values_are_not_stored(db):
+    _mock_contract_and_empenhos([make_empenho(1)])  # todos None
     service = IngestionService(db)
     service.ingest_comprasnet_contracts(SALTO_UASG, **SALTO_ARGS)
     service.ingest_comprasnet_payments(SALTO_UASG)
@@ -111,36 +104,21 @@ def test_pending_invoice_is_not_imported_as_payment(db):
 
 
 @respx.mock
-def test_liquidated_invoice_is_imported(db):
-    _mock_contract_and_financials([], [make_fatura(999, liquidacao="2024-08-01", valor="474,31")])
-    service = IngestionService(db)
-    service.ingest_comprasnet_contracts(SALTO_UASG, **SALTO_ARGS)
-    service.ingest_comprasnet_payments(SALTO_UASG)
-    payments = list(db.scalars(select(Payment)))
-    assert len(payments) == 1
-    assert payments[0].stage.value == "liquidado"
-    assert float(payments[0].value) == 474.31
-    assert payments[0].reference_date.isoformat() == "2024-08-01"
-
-
-@respx.mock
 def test_payment_import_is_idempotent(db):
-    _mock_contract_and_financials([make_empenho(1)], [])
+    _mock_contract_and_empenhos([make_empenho(1, empenhado="100,00", pago="100,00")])
     service = IngestionService(db)
     service.ingest_comprasnet_contracts(SALTO_UASG, **SALTO_ARGS)
     first = service.ingest_comprasnet_payments(SALTO_UASG)
     second = service.ingest_comprasnet_payments(SALTO_UASG)
-    # empenhado, liquidado e pago são gravados (0,00 é valor explícito, não ausente).
-    assert first.records_inserted == 3
+    assert first.records_inserted == 2  # empenhado + pago (liquidado ausente)
     assert second.records_inserted == 0
-    assert second.records_updated >= 1
+    assert second.records_updated >= 0
 
 
 @respx.mock
 def test_api_exposes_payments_and_summary(db, client):
-    _mock_contract_and_financials(
-        [make_empenho(1, empenhado="1.000,00", liquidado="0,00", pago="250,00")],
-        [],
+    _mock_contract_and_empenhos(
+        [make_empenho(1, empenhado="1.000,00", liquidado="0,00", pago="250,00")]
     )
     service = IngestionService(db)
     service.ingest_comprasnet_contracts(SALTO_UASG, **SALTO_ARGS)
@@ -162,12 +140,9 @@ def test_api_exposes_payments_and_summary(db, client):
 
 
 @respx.mock
-def test_contract_without_financials_is_success_with_no_payments(db):
+def test_contract_without_empenhos_is_success_with_no_payments(db):
     _mock_unit([make_record(CONTRACT_ID)], [])
     respx.get(f"{BASE}/api/contrato/{CONTRACT_ID}/empenhos").mock(
-        return_value=httpx.Response(404, json={"detail": "not found"})
-    )
-    respx.get(f"{BASE}/api/contrato/{CONTRACT_ID}/faturas").mock(
         return_value=httpx.Response(404, json={"detail": "not found"})
     )
     service = IngestionService(db)

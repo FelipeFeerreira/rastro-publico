@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { DataNotice, EmptyState, SectionHeading } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ApiError, getEntity, listEntityContracts, listEntityProcurements } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -39,9 +40,16 @@ export default async function EntityDetailPage({ params }: { params: Promise<{ i
         <span>{entity.name}</span>
       </nav>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-3xl font-semibold tracking-tight">{entity.name}</h1>
-        <Badge variant="secondary">{SPHERE[entity.sphere] ?? entity.sphere}</Badge>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight">{entity.name}</h1>
+          <Badge variant="secondary">{SPHERE[entity.sphere] ?? entity.sphere}</Badge>
+        </div>
+        {entity.uasg && (
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/campus/${entity.uasg}`}>Painel do campus</Link>
+          </Button>
+        )}
       </div>
       {entity.cnpj && <p className="mt-2 text-sm text-muted-foreground">CNPJ {entity.cnpj}</p>}
 

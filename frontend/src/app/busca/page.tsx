@@ -111,6 +111,16 @@ export default async function SearchPage({
         <SearchBar defaultValue={query} autoFocus={!query} />
       </div>
 
+      <div className="mx-auto mt-4 flex max-w-3xl flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground">Painéis de destaque:</span>
+        <Link
+          href="/campus/158364"
+          className="rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+        >
+          IFSP — Campus Salto (contratos e pagamentos)
+        </Link>
+      </div>
+
       <div className="mx-auto mt-8 max-w-4xl">
         {!query && (
           <EmptyState

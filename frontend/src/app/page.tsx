@@ -133,6 +133,35 @@ export default async function HomePage() {
         </div>
       </section>
 
+      <section className="container pb-4">
+        <Link href="/campus/158364" className="group block">
+          <Card className="border-primary/30 bg-primary/5 transition-colors hover:border-primary/60">
+            <CardContent className="flex flex-col items-start justify-between gap-4 p-6 md:flex-row md:items-center">
+              <div className="flex items-start gap-4">
+                <div className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Landmark className="size-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-primary">
+                    Painel em destaque
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold tracking-tight">
+                    IFSP — Campus Salto
+                  </h2>
+                  <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                    Quanto o campus contratou e quanto realmente pagou, com fornecedores,
+                    datas e valores. Unidade federal, em Salto/SP.
+                  </p>
+                </div>
+              </div>
+              <Button variant="default" className="shrink-0">
+                Abrir painel <ArrowRight className="size-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        </Link>
+      </section>
+
       <section className="border-y bg-muted/30 py-14">
         <div className="container">
           <div className="mx-auto max-w-2xl text-center">

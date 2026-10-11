@@ -94,7 +94,6 @@ def cmd_comprasnet_pagamentos(args: argparse.Namespace) -> None:
     with session_scope() as db:
         run = IngestionService(db).ingest_comprasnet_payments(
             args.uasg,
-            include_invoices=not args.sem_faturas,
             max_contracts=args.max,
         )
     print(
@@ -193,7 +192,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Importa empenhos (empenhado/liquidado/pago) e faturas liquidadas de uma UASG",
     )
     pagamentos.add_argument("--uasg", required=True, help="Código da unidade gestora")
-    pagamentos.add_argument("--sem-faturas", action="store_true", help="Não importar faturas")
     pagamentos.add_argument("--max", type=int, default=None, help="Limite de contratos")
     pagamentos.set_defaults(func=cmd_comprasnet_pagamentos)
 

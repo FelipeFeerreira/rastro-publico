@@ -74,7 +74,9 @@ com busca funcional; API responde `/api/v1/health`; `pytest` e `vitest` verdes.
 - [x] **Conector Comprasnet Contratos** (federal, por UASG) com importação idempotente e
       piloto real do IFSP Campus Salto (UASG 158364): 253 contratos.
 - [x] **Execução financeira real** (empenhado/liquidado/pago) do IFSP Salto:
-      1.776 lançamentos; estágios separados.
+      1.233 lançamentos de empenho; estágios separados, sem contagem dupla.
+- [x] **Painel do campus** `/campus/{uasg}` (ex.: IFSP Salto) com totais, resumo
+      financeiro, filtros por data/fornecedor/valor e seção de salários.
 - [x] **Busca de remuneração** (interface + API + ingestão) com verificação de campus
       por UORG; **integração bloqueada** sem `TRANSPARENCIA_API_KEY`.
 - [ ] Conector do Portal da Transparência efetivamente ativo (requer chave de API).

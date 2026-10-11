@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.session import get_db
 from app.models.geo import GovernmentEntity, Municipality, State
-from app.models.procurement import Contract, Procurement
+from app.models.procurement import Contract, Payment, Procurement
+from app.models.source import DataSource
 from app.schemas.common import Page
 from app.schemas.domain import (
+    CampusDashboard,
+    CampusFinancials,
+    CampusTotals,
     ContractSummary,
     EntitySummary,
     MunicipalityOut,
     ProcurementSummary,
+    SourceOut,
     StateOut,
 )
 
@@ -148,3 +155,84 @@ def get_municipality(ibge_code: str, db: Session = Depends(get_db)) -> dict:
         "procurement_count": int(procurement_count or 0),
         "estimated_total": float(estimated or 0),
     }
+
+
+# --- Painel de campus (por UASG) ---
+@router.get("/campus/{uasg}", response_model=CampusDashboard)
+def get_campus(uasg: str, db: Session = Depends(get_db)) -> CampusDashboard:
+    """Resumo agregado e verificável de uma unidade gestora (campus/UASG).
+
+    Todos os valores vêm de registros importados. Estágios financeiros são
+    mantidos separados e somados apenas dentro do próprio estágio, evitando
+    contagem duplicada. Contratado nunca é apresentado como pago.
+    """
+    entity = db.scalar(select(GovernmentEntity).where(GovernmentEntity.uasg == uasg))
+    if entity is None:
+        raise HTTPException(status_code=404, detail="Campus (UASG) não encontrado.")
+
+    municipality_name = None
+    uf = None
+    if entity.municipality:
+        municipality_name = entity.municipality.name
+        state = db.get(State, entity.municipality.state_id)
+        uf = state.uf if state else None
+
+    contract_ids = select(Contract.id).where(Contract.uasg == uasg)
+    row = db.execute(
+        select(
+            func.count(Contract.id),
+            func.count(func.distinct(Contract.supplier_id)),
+            func.min(Contract.signed_at),
+            func.max(Contract.signed_at),
+            func.max(Contract.collected_at),
+            func.coalesce(func.sum(Contract.global_value), 0),
+        ).where(Contract.uasg == uasg)
+    ).one()
+    contracts_count, suppliers_count, first_date, last_date, last_collection, contracted = row
+
+    financials = CampusFinancials(contracted=Decimal(contracted or 0))
+    stage_rows = db.execute(
+        select(Payment.stage, func.coalesce(func.sum(Payment.value), 0), func.count(Payment.id))
+        .where(Payment.contract_id.in_(contract_ids))
+        .group_by(Payment.stage)
+    ).all()
+    for stage, total, count in stage_rows:
+        name = stage.value if hasattr(stage, "value") else str(stage)
+        financials.payment_events += int(count)
+        if name == "empenhado":
+            financials.committed = Decimal(total or 0)
+        elif name == "liquidado":
+            financials.liquidated = Decimal(total or 0)
+        elif name == "pago":
+            financials.paid = Decimal(total or 0)
+
+    source = db.get(DataSource, entity.source_id) if entity.source_id else None
+    notes = [
+        "“Contratado” é o valor dos contratos; “pago” é o dinheiro que saiu. "
+        "Contratar não é pagar.",
+        "Despesa federal (IFSP). É diferente da despesa municipal da Prefeitura de "
+        "Salto, que tem orçamento e portal próprios.",
+    ]
+    if financials.liquidated and financials.paid and financials.liquidated < financials.paid:
+        notes.append(
+            "O valor “liquidado” registrado na fonte pode estar subestimado em relação "
+            "ao “pago”; ambos vêm dos empenhos oficiais."
+        )
+
+    return CampusDashboard(
+        entity=EntitySummary.model_validate(entity),
+        uasg=uasg,
+        municipality_name=municipality_name,
+        uf=uf,
+        is_federal=entity.sphere.value == "federal",
+        totals=CampusTotals(
+            contracts=int(contracts_count or 0),
+            suppliers=int(suppliers_count or 0),
+            first_contract_date=first_date,
+            last_contract_date=last_date,
+            last_collection_at=last_collection,
+        ),
+        financials=financials,
+        source=SourceOut.model_validate(source) if source else None,
+        notes=notes,
+    )

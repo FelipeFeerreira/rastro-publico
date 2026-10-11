@@ -132,7 +132,10 @@ proveniências separadas em vez de sobrescrever registros.
 
 - **Rotas** (sem autenticação):
   - `GET /api/contrato/{id}/empenhos` → empenhos com `empenhado`, `liquidado`, `pago`, `rp*`.
-  - `GET /api/contrato/{id}/faturas` → faturas/notas (só as liquidadas entram como pagamento).
+  - `GET /api/contrato/{id}/faturas` → faturas/notas (documentos de apoio; **não somadas**).
+- **Sem contagem dupla:** os estágios financeiros vêm dos **empenhos** (fonte canônica).
+  As faturas documentam a liquidação que já está agregada no empenho; somá-las junto
+  contaria o mesmo dinheiro duas vezes, por isso não viram lançamento de pagamento.
 - **Proveniência:** cada lançamento guarda `source_system`, `external_id`
   (`empenho:{id}:{estágio}` / `fatura:{id}`), URL de origem e data de coleta.
 - **Estágios separados:** “empenhado” reserva, “liquidado” confere, “pago” efetiva.
@@ -144,8 +147,12 @@ proveniências separadas em vez de sobrescrever registros.
 python -m app.cli comprasnet-pagamentos --uasg 158364
 ```
 
-Resultado real (2026-10-11): **1.776 lançamentos** em 249 contratos, 0 erros.
-Empenhado R$ 14.700.551,70 · Liquidado R$ 8.292.995,45 · Pago R$ 8.212.820,59.
+Resultado real (2026-10-11): **1.233 lançamentos de empenho** (411 empenhado, 411
+liquidado, 411 pago) em 249 contratos, 0 erros.
+Empenhado R$ 14.700.551,70 · Liquidado R$ 139.967,62 · Pago R$ 8.212.820,59.
+
+> Observação de qualidade: na fonte, o campo `liquidado` do empenho pode estar
+> sub-registrado em relação a `pago`; o painel informa isso ao cidadão.
 
 Verificação:
 

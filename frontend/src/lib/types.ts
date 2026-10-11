@@ -24,6 +24,7 @@ export interface Municipality {
 export interface EntitySummary {
   id: number;
   cnpj: string | null;
+  uasg: string | null;
   name: string;
   acronym: string | null;
   sphere: string;
@@ -131,6 +132,7 @@ export interface ContractSummary {
   supplier: SupplierSummary | null;
   entity: EntitySummary | null;
   source_url: string | null;
+  paid_value?: number | string | null;
 }
 
 export interface PaymentSummary {
@@ -159,6 +161,34 @@ export interface ContractDetail extends ContractSummary {
   amendments: Amendment[];
   payment_summary?: PaymentSummary | null;
   source?: Source | null;
+}
+
+export interface CampusTotals {
+  contracts: number;
+  suppliers: number;
+  first_contract_date: string | null;
+  last_contract_date: string | null;
+  last_collection_at: string | null;
+}
+
+export interface CampusFinancials {
+  contracted: number | string;
+  committed: number | string;
+  liquidated: number | string;
+  paid: number | string;
+  payment_events: number;
+}
+
+export interface CampusDashboard {
+  entity: EntitySummary;
+  uasg: string;
+  municipality_name: string | null;
+  uf: string | null;
+  is_federal: boolean;
+  totals: CampusTotals;
+  financials: CampusFinancials;
+  source: Source | null;
+  notes: string[];
 }
 
 export interface Remuneration {

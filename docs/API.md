@@ -43,8 +43,8 @@ Todos os erros seguem o formato:
 |--------|------|-----------|
 | GET | `/contratacoes?page=&page_size=&uf=&municipality_ibge=&entity_id=&year=&modality=` | Lista paginada |
 | GET | `/contratacoes/{id}` | Detalhe com itens e resultados |
-| GET | `/contratos?page=&page_size=&uf=&entity_id=&supplier_id=&year=` | Lista paginada |
-| GET | `/contratos/{id}` | Detalhe com aditivos |
+| GET | `/contratos?page=&page_size=&uf=&entity_id=&supplier_id=&supplier_name=&year=&uasg=&source_system=&organization_code=&q=&date_from=&date_to=&min_value=&max_value=&order=` | Lista paginada (cada item traz `paid_value`) |
+| GET | `/contratos/{id}` | Detalhe com aditivos e `payment_summary` |
 
 ## Fornecedores
 
@@ -63,6 +63,7 @@ Todos os erros seguem o formato:
 | GET | `/orgaos/{id}` | Detalhe |
 | GET | `/orgaos/{id}/contratacoes` | Contratações do órgão |
 | GET | `/orgaos/{id}/contratos` | Contratos do órgão |
+| GET | `/campus/{uasg}` | Painel agregado do campus (totais + resumo financeiro) |
 | GET | `/estados` | Unidades da Federação |
 | GET | `/municipios?q=&uf=&page=` | Municípios |
 | GET | `/municipios/{ibge_code}` | Detalhe com totais |
@@ -103,6 +104,10 @@ Status de revisão válidos: `aguardando_verificacao`, `em_analise`, `documentad
 `stage` ∈ `empenhado` \| `liquidado` \| `pago`. O detalhe do contrato
 (`/contratos/{id}`) inclui `payment_summary` com os totais **por estágio** —
 estágios nunca são somados como se fossem o mesmo.
+
+Os lançamentos vêm dos **empenhos** do Comprasnet. As **faturas** não são persistidas
+como pagamento: elas documentam a liquidação já agregada no empenho e somá-las contaria
+o mesmo dinheiro duas vezes.
 
 ## Servidores e remuneração
 

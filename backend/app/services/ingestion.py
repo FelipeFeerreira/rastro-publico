@@ -819,18 +819,17 @@ class IngestionService:
         self,
         uasg: str,
         *,
-        include_invoices: bool = True,
         max_contracts: int | None = None,
     ) -> CollectionRun:
-        """Importa empenhos (estágios) e faturas liquidadas dos contratos de uma UASG.
+        """Importa os estágios de empenho dos contratos de uma UASG.
 
         Só importa contratos já sincronizados (source_system='comprasnet', uasg).
-        Não confunde valor contratado com valor pago: cada lançamento tem seu estágio.
+        Não confunde valor contratado com valor pago e não duplica estágios
+        (as faturas documentam a liquidação, já agregada no empenho).
         """
         source = get_source(self.db, "comprasnet")
         params = {
             "uasg": uasg,
-            "incluir_faturas": include_invoices,
             "max": max_contracts,
         }
         run = self._start_run(source, scope=f"comprasnet/pagamentos/ug/{uasg}", params=params)
@@ -862,7 +861,7 @@ class IngestionService:
                     try:
                         with self.db.begin_nested():
                             self._ingest_contract_payments(
-                                connector, contract, source, run, stats, include_invoices
+                                connector, contract, source, run, stats
                             )
                     except Exception as exc:  # noqa: BLE001
                         stats.record_error(f"contrato {contract.external_id}: {exc}")
@@ -891,8 +890,14 @@ class IngestionService:
         source: DataSource,
         run: CollectionRun | None,
         stats: IngestionStats,
-        include_invoices: bool,
     ) -> None:
+        """Persiste os ESTÁGIOS DO EMPENHO (empenhado/liquidado/pago).
+
+        As faturas NÃO viram lançamentos de pagamento: elas documentam a
+        liquidação/faturamento que já está agregada nos campos do empenho.
+        Somar ambos contaria o mesmo dinheiro duas vezes. As faturas permanecem
+        disponíveis na fonte oficial como documento de apoio.
+        """
         supplier_id: int | None = None
 
         for emp in connector.fetch_contract_commitments(contract.external_id or ""):
@@ -930,34 +935,6 @@ class IngestionService:
                 )
                 stats.inserted += int(is_new)
                 stats.updated += int(not is_new and value is not None)
-
-        if not include_invoices:
-            return
-
-        for fat in connector.fetch_contract_invoices(contract.external_id or ""):
-            # Só faturas efetivamente liquidadas/pagas entram como pagamento.
-            if not fat.get("data_liquidacao"):
-                continue
-            supplier = self._supplier(
-                fat.get("fornecedor_contrato"),
-                None,
-                None,
-            )
-            if supplier is not None:
-                supplier_id = supplier.id
-            is_new = self._upsert_payment(
-                contract,
-                stage=FinancialStage.LIQUIDADO,
-                value=fat.get("valorliquido") or fat.get("valor"),
-                reference_date=fat.get("data_liquidacao") or fat.get("vencimento"),
-                external_id=f"fatura:{fat.get('id')}",
-                description=f"Fatura {fat.get('numero')} — {fat.get('tipo_instrumento_cobranca') or ''}".strip(" —"),
-                source_url=contract.source_url,
-                supplier_id=supplier_id,
-                source=source,
-            )
-            stats.inserted += int(is_new)
-            stats.updated += int(not is_new)
 
     # ------------------------------------------------------------------ #
     # Portal da Transparência — servidores e remuneração (Exige chave)

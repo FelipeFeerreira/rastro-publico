@@ -173,6 +173,8 @@ class ContractSummary(BaseModel):
     supplier: SupplierSummary | None = None
     entity: EntitySummary | None = None
     source_url: str | None = None
+    # Soma dos lançamentos PAGOS do contrato (não é o valor contratado).
+    paid_value: Decimal | None = None
 
 
 class AmendmentOut(BaseModel):
@@ -218,3 +220,33 @@ class ContractDetail(ContractSummary):
     amendments: list[AmendmentOut] = Field(default_factory=list)
     payment_summary: PaymentSummary | None = None
     source: SourceOut | None = None
+
+
+class CampusTotals(BaseModel):
+    contracts: int = 0
+    suppliers: int = 0
+    first_contract_date: date | None = None
+    last_contract_date: date | None = None
+    last_collection_at: datetime | None = None
+
+
+class CampusFinancials(BaseModel):
+    """Estágios mantidos separados. Nunca somar estágios diferentes entre si."""
+
+    contracted: Decimal = Decimal("0")
+    committed: Decimal = Decimal("0")
+    liquidated: Decimal = Decimal("0")
+    paid: Decimal = Decimal("0")
+    payment_events: int = 0
+
+
+class CampusDashboard(BaseModel):
+    entity: EntitySummary
+    uasg: str
+    municipality_name: str | None = None
+    uf: str | None = None
+    is_federal: bool = True
+    totals: CampusTotals
+    financials: CampusFinancials
+    source: SourceOut | None = None
+    notes: list[str] = Field(default_factory=list)

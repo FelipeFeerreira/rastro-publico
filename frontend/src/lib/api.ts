@@ -1,6 +1,7 @@
 import type {
   AssistantAnswer,
   AuthUser,
+  CampusDashboard,
   ComparisonResponse,
   ContractDetail,
   ContractSummary,
@@ -117,6 +118,14 @@ export function getProcurement(id: string | number) {
 
 export function getContract(id: string | number) {
   return apiFetch<ContractDetail>(`/contratos/${id}`);
+}
+
+export function listContracts(params: Record<string, string | number | undefined>) {
+  return apiFetch<Page<ContractSummary>>(`/contratos${qs(params)}`);
+}
+
+export function getCampus(uasg: string) {
+  return apiFetch<CampusDashboard>(`/campus/${uasg}`);
 }
 
 // --- Fornecedores ---

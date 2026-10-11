@@ -43,6 +43,14 @@ O Rastro Público oferece duas experiências integradas:
 A primeira integração real é o **Portal Nacional de Contratações Públicas (PNCP)**,
 cobrindo contratações sob a Lei 14.133/2021 de União, estados e municípios.
 
+### Painel de campus
+
+Há um painel dedicado por unidade gestora (UASG) em `/campus/{uasg}` — por exemplo
+`/campus/158364` (**IFSP Campus Salto**). Ele reúne, em linguagem simples: o que foi
+contratado, fornecedores, período, valores e quanto foi **realmente pago**, com filtros
+por data, fornecedor e valor. Despesa **federal** (IFSP) é mantida separada da despesa
+**municipal** de Salto. Acessível pela página inicial e pelos resultados de busca.
+
 ## Arquitetura
 
 Monólito modular com fronteiras claras:
