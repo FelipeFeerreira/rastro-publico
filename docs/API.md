@@ -126,6 +126,11 @@ O resumo retorna `committed_net = empenhado + reforço − anulação` e um obje
 (anos com menos de 12 meses). Documentos de pessoa física (CPF) nunca são expostos —
 apenas CNPJ (14 dígitos).
 
+Cada evento pode trazer detalhes oficiais (enriquecimento): `detail_id`,
+`detail_url`, `history`, `activity_description`, `government_function`,
+`government_subfunction`, `expense_element`, `funding_source` e
+`enrichment_status` (`enriched` \| `not_found` \| `ambiguous`).
+
 ## Servidores e remuneração
 
 | Método | Rota | Descrição |

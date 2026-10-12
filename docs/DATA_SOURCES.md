@@ -222,6 +222,25 @@ python -m app.cli tce-sp-despesas --municipio salto --ibge 3545209 --uf SP \
   --nome-municipio Salto --ano 2025 --mes-inicio 1 --mes-fim 12
 ```
 
+### Enriquecimento (o que foi pago e por quê)
+
+O próprio **conjunto de dados** do TCE-SP traz um CSV por município com campos de
+detalhe que a API de eventos não expõe: histórico, descrição da ação, função e
+subfunção de governo, elemento de despesa, fonte de recurso e o
+`id_despesa_detalhe` (mesmo id da página de detalhe).
+
+- **DL:** `https://transparencia.tce.sp.gov.br/sites/default/files/csv/despesas-{municipio}-{ano}.zip`
+  (ISO-8859-1, separador `;`). É um arquivo **do município**, não estadual.
+- **Correspondência:** chave natural (ano, órgão, mês, evento, nº empenho,
+  documento, data, valor), normalizada nos dois lados. Verificada **1:1 sem
+  ambiguidade** (2025: 43.944; 2026: 28.279). Nunca "chutamos" o id do detalhe.
+- **Comando:** `python -m app.cli tce-sp-detalhes --municipio salto --ibge 3545209 --ano 2025 --max 100`
+  (`--max` limita; `--force` reenriquece).
+- **Idempotente:** reexecutar não repete o que já está `enriched`.
+
+Resultado real: **72.223 registros enriquecidos** (100%), 0 sem correspondência,
+0 ambíguos, com histórico e descrição da ação preenchidos.
+
 ### Painel e cobertura
 
 O painel `/municipios/3545209/despesas` exibe o pago como métrica principal, os

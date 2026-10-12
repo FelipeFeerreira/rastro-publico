@@ -143,6 +143,48 @@ class BaseConnector:
             f"{self.config.name}: falha após {self.config.max_retries} tentativas em {path}"
         ) from last_error
 
+    def download(self, path: str) -> bytes:
+        """Baixa um recurso binário (ex.: CSV/ZIP) com retries e rate limit."""
+        if self._client is None:
+            raise ConnectorError("Conector usado fora do contexto (use `with`).")
+
+        last_error: Exception | None = None
+        for attempt in range(1, self.config.max_retries + 1):
+            self._throttle()
+            try:
+                response = self._client.get(path)
+                self._last_request_at = time.monotonic()
+                if response.status_code == 429:
+                    retry_after = float(response.headers.get("Retry-After", "1"))
+                    time.sleep(min(retry_after, 30))
+                    continue
+                if response.status_code >= 500:
+                    raise httpx.HTTPStatusError(
+                        f"HTTP {response.status_code}",
+                        request=response.request,
+                        response=response,
+                    )
+                if response.status_code >= 400:
+                    raise ConnectorError(
+                        f"{self.config.name}: HTTP {response.status_code} em {path}"
+                    )
+                return response.content
+            except (httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError) as exc:
+                last_error = exc
+                backoff = min(2 ** (attempt - 1), 15)
+                logger.warning(
+                    "Falha de download (%s/%s) em %s%s: %s",
+                    attempt, self.config.max_retries, self.config.name, path, exc,
+                    extra={"connector": self.config.name},
+                )
+                if attempt == self.config.max_retries:
+                    break
+                time.sleep(backoff)
+        raise ConnectorError(
+            f"{self.config.name}: falha no download após {self.config.max_retries} "
+            f"tentativas em {path}"
+        ) from last_error
+
     # --- paginação ---
     def paginate(
         self,

@@ -135,6 +135,7 @@ export function InstitutionBreakdown({ items }: { items: MunicipalInstitutionTot
 }
 
 const DESCRIPTION_FALLBACK = "Descrição não informada pela fonte";
+const PURPOSE_FALLBACK = "Finalidade não detalhada pela fonte";
 
 /** Mostra a descrição da despesa ou o aviso explícito de ausência. */
 export function ExpenseDescription({ description }: { description: string | null }) {
@@ -144,4 +145,12 @@ export function ExpenseDescription({ description }: { description: string | null
   return <span>{description}</span>;
 }
 
-export { DESCRIPTION_FALLBACK };
+/** Prioriza "o que foi pago e por quê?" (ação oficial), com fallback honesto. */
+export function PurposeText({ purpose }: { purpose: string | null }) {
+  if (!purpose || !purpose.trim()) {
+    return <span className="italic text-muted-foreground">{PURPOSE_FALLBACK}</span>;
+  }
+  return <span>{purpose}</span>;
+}
+
+export { DESCRIPTION_FALLBACK, PURPOSE_FALLBACK };

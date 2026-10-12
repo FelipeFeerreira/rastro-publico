@@ -141,6 +141,22 @@ def cmd_tce_sp_despesas(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_tce_sp_detalhes(args: argparse.Namespace) -> None:
+    with session_scope() as db:
+        run = IngestionService(db).enrich_tce_sp_expense_details(
+            args.municipio,
+            ibge_code=args.ibge,
+            year=args.ano,
+            limit=args.max,
+            force=args.force,
+        )
+    print(
+        f"Execução #{run.id} [{run.status.value}] TCE-SP detalhes {args.municipio}/{args.ano} "
+        f"alvos={run.records_fetched} enriquecidos={run.records_updated} "
+        f"sem_correspondencia/ambíguos={run.records_skipped} erros={run.error_count}"
+    )
+
+
 def cmd_audit(args: argparse.Namespace) -> None:
     with session_scope() as db:
         created = AuditEngine(db).run_scan(limit=args.limit)
@@ -240,6 +256,17 @@ def build_parser() -> argparse.ArgumentParser:
     tce.add_argument("--mes-fim", type=int, default=12)
     tce.add_argument("--max", type=int, default=None, help="Limite de registros (bounded)")
     tce.set_defaults(func=cmd_tce_sp_despesas)
+
+    detalhes = sub.add_parser(
+        "tce-sp-detalhes",
+        help="Enriquece despesas municipais com os detalhes oficiais do CSV do TCE-SP",
+    )
+    detalhes.add_argument("--municipio", required=True, help="Slug do município (ex.: salto)")
+    detalhes.add_argument("--ibge", required=True, help="Código IBGE (ex.: 3545209)")
+    detalhes.add_argument("--ano", type=int, required=True, help="Exercício (ex.: 2025)")
+    detalhes.add_argument("--max", type=int, default=100, help="Limite de registros (bounded)")
+    detalhes.add_argument("--force", action="store_true", help="Reenriquecer já enriquecidos")
+    detalhes.set_defaults(func=cmd_tce_sp_detalhes)
 
     audit = sub.add_parser("audit", help="Executa o motor de auditoria")
     audit.add_argument("--limit", type=int, default=500)

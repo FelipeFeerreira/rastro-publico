@@ -5,9 +5,9 @@ import { AlertTriangle, CalendarClock, ExternalLink, Info, Store } from "lucide-
 
 import { DataNotice, EmptyState, Pagination, StatCard } from "@/components/common";
 import {
-  ExpenseDescription,
   InstitutionBreakdown,
   MunicipalFinancialCards,
+  PurposeText,
   describeCoverage,
 } from "@/components/municipal-summary";
 import { Badge } from "@/components/ui/badge";
@@ -274,48 +274,93 @@ export default async function MunicipalExpensesPage({
                   description="Ajuste o período, a instituição, o fornecedor ou o estágio."
                 />
               ) : (
-                expenses.items.map((expense) => (
-                  <Card key={expense.id}>
-                    <CardContent className="p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm">
-                            <ExpenseDescription description={expense.description} />
-                          </p>
-                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <span>{expense.entity_name ?? "Instituição não informada"}</span>
-                            <span className="inline-flex items-center gap-1">
-                              <Store className="size-3.5" />
-                              {expense.supplier_name ?? "Fornecedor não informado"}
+                expenses.items.map((expense) => {
+                  const officialUrl = expense.detail_url ?? expense.source_url;
+                  const hasDetails =
+                    expense.history ||
+                    expense.expense_element ||
+                    expense.government_subfunction ||
+                    expense.funding_source;
+                  return (
+                    <Card key={expense.id}>
+                      <CardContent className="p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium">
+                              <PurposeText purpose={expense.activity_description} />
+                            </p>
+                            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                              <span>{expense.entity_name ?? "Instituição não informada"}</span>
+                              <span className="inline-flex items-center gap-1">
+                                <Store className="size-3.5" />
+                                {expense.supplier_name ?? "Fornecedor não informado"}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <CalendarClock className="size-3.5" />
+                                {formatDate(expense.event_date)}
+                              </span>
+                              {expense.government_function && (
+                                <Badge variant="muted">{expense.government_function}</Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-base font-semibold tabular-nums">
+                              {formatCurrency(expense.value)}
                             </span>
-                            <span className="inline-flex items-center gap-1">
-                              <CalendarClock className="size-3.5" />
-                              {formatDate(expense.event_date)}
-                            </span>
+                            <Badge variant={expense.stage === "pago" ? "success" : "muted"}>
+                              {STAGE_LABEL[expense.stage] ?? expense.stage}
+                            </Badge>
+                            {officialUrl && (
+                              <a
+                                href={officialUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              >
+                                <ExternalLink className="size-3" /> ver detalhe oficial
+                              </a>
+                            )}
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-base font-semibold tabular-nums">
-                            {formatCurrency(expense.value)}
-                          </span>
-                          <Badge variant={expense.stage === "pago" ? "success" : "muted"}>
-                            {STAGE_LABEL[expense.stage] ?? expense.stage}
-                          </Badge>
-                          {expense.source_url && (
-                            <a
-                              href={expense.source_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                            >
-                              <ExternalLink className="size-3" /> fonte oficial
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
+
+                        {hasDetails && (
+                          <details className="mt-3 border-t pt-2 text-xs text-muted-foreground">
+                            <summary className="cursor-pointer list-none">
+                              Detalhes oficiais (texto original)
+                            </summary>
+                            <dl className="mt-2 space-y-1">
+                              {expense.history && (
+                                <div>
+                                  <dt className="inline font-medium text-foreground">Histórico: </dt>
+                                  <dd className="inline">{expense.history}</dd>
+                                </div>
+                              )}
+                              {expense.government_subfunction && (
+                                <div>
+                                  <dt className="inline font-medium text-foreground">Subfunção: </dt>
+                                  <dd className="inline">{expense.government_subfunction}</dd>
+                                </div>
+                              )}
+                              {expense.expense_element && (
+                                <div>
+                                  <dt className="inline font-medium text-foreground">Categoria (elemento): </dt>
+                                  <dd className="inline">{expense.expense_element}</dd>
+                                </div>
+                              )}
+                              {expense.funding_source && (
+                                <div>
+                                  <dt className="inline font-medium text-foreground">Fonte do recurso: </dt>
+                                  <dd className="inline">{expense.funding_source}</dd>
+                                </div>
+                              )}
+                            </dl>
+                          </details>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
 

@@ -69,6 +69,19 @@ class MunicipalExpense(Base, TimestampMixin):
     source_url: Mapped[str | None] = mapped_column(String(600))
     collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # --- Enriquecimento (dados oficiais de detalhe do TCE-SP) ---
+    detail_id: Mapped[str | None] = mapped_column(String(40))
+    detail_url: Mapped[str | None] = mapped_column(String(300))
+    history: Mapped[str | None] = mapped_column(Text)
+    activity_description: Mapped[str | None] = mapped_column(Text)
+    government_function: Mapped[str | None] = mapped_column(String(120))
+    government_subfunction: Mapped[str | None] = mapped_column(String(120))
+    expense_element: Mapped[str | None] = mapped_column(String(220))
+    funding_source: Mapped[str | None] = mapped_column(String(120))
+    # enriched | not_found | ambiguous
+    enrichment_status: Mapped[str | None] = mapped_column(String(20))
+    enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     municipality = relationship("Municipality")
     entity = relationship("GovernmentEntity")
     supplier = relationship("Supplier")

@@ -83,6 +83,9 @@ com busca funcional; API responde `/api/v1/health`; `pytest` e `vitest` verdes.
 - [x] **Painel municipal de Salto** `/municipios/3545209/despesas` com pago em
       destaque, estágios separados, quebra por instituição, exploração com filtros
       e cobertura parcial explícita (2026: jan–ago).
+- [x] **Enriquecimento oficial** das 72.223 despesas municipais (histórico,
+      função/atividade, elemento, fonte e link do detalhe) via conjunto de dados
+      do TCE-SP, com correspondência 1:1 verificada.
 - [x] **Busca de remuneração** (interface + API + ingestão) com verificação de campus
       por UORG; **integração bloqueada** sem `TRANSPARENCIA_API_KEY`.
 - [ ] Conector do Portal da Transparência efetivamente ativo (requer chave de API).

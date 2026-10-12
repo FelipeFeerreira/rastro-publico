@@ -209,6 +209,15 @@ export interface MunicipalExpense {
   description: string | null;
   source_url: string | null;
   collected_at: string | null;
+  detail_id: string | null;
+  detail_url: string | null;
+  history: string | null;
+  activity_description: string | null;
+  government_function: string | null;
+  government_subfunction: string | null;
+  expense_element: string | null;
+  funding_source: string | null;
+  enrichment_status: string | null;
 }
 
 export interface MunicipalCoverage {

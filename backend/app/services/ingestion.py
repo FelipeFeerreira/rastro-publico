@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.connectors.comprasnet import ComprasnetContratosConnector
@@ -40,6 +40,7 @@ from app.models.procurement import (
 from app.models.source import CollectionRun, DataSource
 from app.models.supplier import Supplier
 from app.services import normalization as norm
+from app.services.municipal_enrichment import key_from_csv_row, key_from_expense
 from app.services.reference_data import get_source
 
 logger = get_logger(__name__)
@@ -1282,6 +1283,143 @@ class IngestionService:
             stats.record_error(str(exc))
             status = CollectionStatus.FAILED
             logger.exception("Execução TCE-SP falhou: %s", exc)
+        finally:
+            self._finish_run(run, stats, status)
+
+        return run
+
+    # ------------------------------------------------------------------ #
+    # TCE-SP — enriquecimento de despesas municipais (detalhes oficiais)
+    # ------------------------------------------------------------------ #
+    def _apply_expense_enrichment(
+        self,
+        expense: MunicipalExpense,
+        row: dict[str, Any],
+        *,
+        municipio: str,
+        ano: int,
+    ) -> None:
+        detail_id = (row.get("id_despesa_detalhe") or "").strip()
+
+        def clean(key: str) -> str | None:
+            value = (row.get(key) or "").strip()
+            return value or None
+
+        expense.detail_id = detail_id or None
+        expense.detail_url = (
+            TceSpConnector.detail_url(municipio, ano, detail_id) if detail_id else None
+        )
+        expense.history = clean("historico_despesa")
+        expense.activity_description = clean("ds_acao")
+        expense.government_function = clean("ds_funcao_governo")
+        expense.government_subfunction = clean("ds_subfuncao_governo")
+        expense.expense_element = clean("ds_elemento")
+        expense.funding_source = clean("ds_fonte_recurso")
+        expense.enrichment_status = "enriched"
+        expense.enriched_at = utcnow()
+
+    def enrich_tce_sp_expense_details(
+        self,
+        municipio: str,
+        *,
+        ibge_code: str,
+        year: int,
+        limit: int = 100,
+        force: bool = False,
+    ) -> CollectionRun:
+        """Enriquece até `limit` despesas com os detalhes oficiais do TCE-SP.
+
+        Usa o CSV do conjunto de dados (download oficial). Casa 1:1 por chave
+        natural; registros sem correspondência ou ambíguos são marcados, nunca
+        descritos por suposição. Idempotente: reexecutar não repete o que já foi
+        enriquecido (salvo `force=True`).
+        """
+        source = get_source(self.db, "tce_sp")
+        run = self._start_run(
+            source,
+            scope=f"tce_sp/detalhes/{municipio}/{year}",
+            params={"municipio": municipio, "ano": year, "limite": limit, "force": force},
+        )
+        stats = IngestionStats()
+        status = CollectionStatus.SUCCESS
+
+        municipality = self.db.scalar(
+            select(Municipality).where(Municipality.ibge_code == ibge_code)
+        )
+        if municipality is None:
+            stats.record_error(f"Município {ibge_code} não encontrado.")
+            self._finish_run(run, stats, CollectionStatus.FAILED)
+            return run
+
+        query = select(MunicipalExpense).where(
+            MunicipalExpense.municipality_id == municipality.id,
+            MunicipalExpense.event_year == year,
+        )
+        if not force:
+            query = query.where(
+                or_(
+                    MunicipalExpense.enrichment_status.is_(None),
+                    MunicipalExpense.enrichment_status != "enriched",
+                )
+            )
+        targets = list(self.db.scalars(query.order_by(MunicipalExpense.id).limit(limit)))
+        if not targets:
+            stats.record_error("Nenhuma despesa pendente de enriquecimento para o recorte.")
+            status = CollectionStatus.SUCCESS
+            self._finish_run(run, stats, status)
+            return run
+
+        entity_ids = [e.entity_id for e in targets if e.entity_id]
+        names = (
+            {
+                e.id: e.name
+                for e in self.db.scalars(
+                    select(GovernmentEntity).where(GovernmentEntity.id.in_(entity_ids))
+                )
+            }
+            if entity_ids
+            else {}
+        )
+        targets_by_key: dict[str, list[MunicipalExpense]] = {}
+        for expense in targets:
+            key = key_from_expense(expense, names.get(expense.entity_id))
+            targets_by_key.setdefault(key, []).append(expense)
+
+        try:
+            with TceSpConnector() as connector:
+                zip_bytes = connector.download_despesas_zip(municipio, year)
+                matches: dict[str, list[dict[str, Any]]] = {}
+                for row in connector.iter_despesas_csv(zip_bytes):
+                    key = key_from_csv_row(row)
+                    if key in targets_by_key:
+                        matches.setdefault(key, []).append(row)
+
+            stats.fetched = len(targets)
+            for key, expenses in targets_by_key.items():
+                rows = matches.get(key, [])
+                if len(rows) == 1:
+                    for expense in expenses:
+                        self._apply_expense_enrichment(expense, rows[0], municipio=municipio, ano=year)
+                        stats.updated += 1
+                elif not rows:
+                    for expense in expenses:
+                        expense.enrichment_status = "not_found"
+                        expense.enriched_at = utcnow()
+                        stats.skipped += 1
+                else:
+                    for expense in expenses:
+                        expense.enrichment_status = "ambiguous"
+                        expense.enriched_at = utcnow()
+                        stats.skipped += 1
+                    stats.record_error(f"Correspondência ambígua ({len(rows)} linhas) para chave {key[:10]}")
+            self.db.commit()
+
+            if stats.errors and stats.updated or stats.errors and not stats.updated:
+                status = CollectionStatus.PARTIAL
+        except Exception as exc:  # noqa: BLE001 - falha de download/parse
+            stats.record_error(str(exc))
+            status = CollectionStatus.FAILED
+            logger.exception("Enriquecimento TCE-SP falhou: %s", exc)
         finally:
             self._finish_run(run, stats, status)
 

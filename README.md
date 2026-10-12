@@ -161,6 +161,10 @@ python -m app.cli comprasnet-pagamentos --uasg 158364
 python -m app.cli tce-sp-despesas --municipio salto --ibge 3545209 --uf SP \
   --nome-municipio Salto --ano 2025 --mes-inicio 1 --mes-fim 12
 
+# Enriquecimento: histórico, função/atividade e link do detalhe oficial
+# (CSV do conjunto de dados do TCE-SP; correspondência 1:1, idempotente)
+python -m app.cli tce-sp-detalhes --municipio salto --ibge 3545209 --ano 2025 --max 100
+
 # Remuneração de servidores federais (exige TRANSPARENCIA_API_KEY)
 python -m app.cli transparencia-servidores --orgao 26439 --mes 202501 \
   --campus "IFSP - CAMPUS SALTO"

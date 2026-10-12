@@ -21,8 +21,12 @@ Importante: é despesa **municipal**, não contrato. Não vinculamos a contratos
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
 import re
+import zipfile
+from collections.abc import Iterator
 from typing import Any
 
 from app.connectors.base import BaseConnector, ConnectorConfig
@@ -128,3 +132,25 @@ class TceSpConnector(BaseConnector):
     @staticmethod
     def source_url(municipio: str, ano: int, mes: int) -> str:
         return f"{TCE_SP_BASE_URL}/api/json/despesas/{municipio}/{ano}/{mes}"
+
+    # --- Conjunto de dados oficial (CSV) com os detalhes ---
+    def download_despesas_zip(self, municipio: str, ano: int) -> bytes:
+        """Baixa o CSV oficial de despesas do município (conjunto de dados)."""
+        return self.download(
+            f"/sites/default/files/csv/despesas-{municipio}-{ano}.zip"
+        )
+
+    @staticmethod
+    def iter_despesas_csv(zip_bytes: bytes) -> Iterator[dict[str, str]]:
+        """Itera as linhas do CSV (ISO-8859-1, separador ';') de forma preguiçosa."""
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as archive:
+            name = next(n for n in archive.namelist() if n.lower().endswith(".csv"))
+            with archive.open(name) as raw:
+                text = io.TextIOWrapper(raw, encoding="latin-1", newline="")
+                yield from csv.DictReader(text, delimiter=";")
+
+    @staticmethod
+    def detail_url(municipio: str, ano: int | str, detail_id: str) -> str:
+        return (
+            f"{TCE_SP_BASE_URL}/municipio/{municipio}/{ano}/despesas/detalhe/{detail_id}"
+        )

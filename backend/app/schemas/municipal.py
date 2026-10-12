@@ -28,6 +28,16 @@ class MunicipalExpenseOut(BaseModel):
     description: str | None = None
     source_url: str | None = None
     collected_at: datetime | None = None
+    # Enriquecimento (detalhes oficiais do TCE-SP).
+    detail_id: str | None = None
+    detail_url: str | None = None
+    history: str | None = None
+    activity_description: str | None = None
+    government_function: str | None = None
+    government_subfunction: str | None = None
+    expense_element: str | None = None
+    funding_source: str | None = None
+    enrichment_status: str | None = None
 
 
 class MunicipalCoverage(BaseModel):

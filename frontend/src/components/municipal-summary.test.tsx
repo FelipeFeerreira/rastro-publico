@@ -6,6 +6,8 @@ import {
   ExpenseDescription,
   InstitutionBreakdown,
   MunicipalFinancialCards,
+  PURPOSE_FALLBACK,
+  PurposeText,
   describeCoverage,
 } from "./municipal-summary";
 import type { MunicipalExpenseTotals } from "@/lib/types";
@@ -68,6 +70,18 @@ describe("ExpenseDescription", () => {
   it("mostra a descrição quando existe", () => {
     render(<ExpenseDescription description="Compra de material" />);
     expect(screen.getByText("Compra de material")).toBeInTheDocument();
+  });
+});
+
+describe("PurposeText", () => {
+  it("mostra a finalidade oficial quando disponível", () => {
+    render(<PurposeText purpose="Manutenção das atividades do Gabinete" />);
+    expect(screen.getByText("Manutenção das atividades do Gabinete")).toBeInTheDocument();
+  });
+
+  it("avisa quando a finalidade não está detalhada", () => {
+    render(<PurposeText purpose={null} />);
+    expect(screen.getByText(PURPOSE_FALLBACK)).toBeInTheDocument();
   });
 });
 
