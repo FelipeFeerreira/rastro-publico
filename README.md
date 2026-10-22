@@ -1,5 +1,14 @@
 # Rastro Público
 
+> **English summary** - *Where does public money go?* An independent, non-partisan
+> open-source platform for searching and investigating Brazilian public spending:
+> natural-language search, procurement dashboards, price comparison across
+> equivalent purchases, and a deterministic audit engine that flags anomalies for
+> **human review**, never as proof of wrongdoing. Data comes from official public
+> sources (PNCP, Comprasnet, TCE-SP) and keeps a link to the original record.
+> Next.js + FastAPI + PostgreSQL, runnable with Docker Compose.
+>
+> Menu, documentation and UI are in Brazilian Portuguese.
 **Para onde vai o dinheiro público?**
 
 Plataforma independente, apartidária e de código aberto para **pesquisar, entender e
