@@ -9,6 +9,7 @@
 > Next.js + FastAPI + PostgreSQL, runnable with Docker Compose.
 >
 > Menu, documentation and UI are in Brazilian Portuguese.
+
 **Para onde vai o dinheiro público?**
 
 Plataforma independente, apartidária e de código aberto para **pesquisar, entender e
