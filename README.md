@@ -255,7 +255,7 @@ politica/
 
 ## Licença e uso responsável
 
-Codigo sob licenca MIT - ver [LICENSE](LICENSE).
+Código sob licença MIT — ver [LICENSE](LICENSE).
 
 Plataforma de interesse público. Ao reutilizar os dados, cite a fonte oficial e o
 Rastro Público. Não apresente achados automáticos como prova de irregularidade.
