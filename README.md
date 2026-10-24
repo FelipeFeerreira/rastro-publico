@@ -24,6 +24,13 @@ irregularidade.
 
 ---
 
+| | |
+|:--|:--|
+| **Live demo** | [rastro-publico.vercel.app](https://rastro-publico.vercel.app) |
+| **Screenshots** | Pending — no screenshots yet |
+| **Stack** | FastAPI · Python · Next.js · TypeScript · PostgreSQL · Docker Compose |
+| **License** | MIT — [LICENSE](LICENSE) |
+
 ## Sumário
 
 - [Visão geral](#visão-geral)
@@ -252,6 +259,12 @@ politica/
 - [`docs/API.md`](./docs/API.md) — referência da API
 - [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) — implantação e operação
 - [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md) — fontes e requisitos
+
+## O que eu faria a seguir
+
+- Adicionar CI no GitHub Actions rodando a suíte de backend e o build do frontend, com badge no README.
+- Ampliar os conectores de ingestão e documentar a cobertura por fonte no ROADMAP.
+- Capturar telas do painel municipal e do motor de auditoria para o topo do README.
 
 ## Licença e uso responsável
 
