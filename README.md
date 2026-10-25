@@ -1,26 +1,18 @@
 # Rastro Público
 
-> **English summary** - *Where does public money go?* An independent, non-partisan
-> open-source platform for searching and investigating Brazilian public spending:
-> natural-language search, procurement dashboards, price comparison across
-> equivalent purchases, and a deterministic audit engine that flags anomalies for
-> **human review**, never as proof of wrongdoing. Data comes from official public
-> sources (PNCP, Comprasnet, TCE-SP) and keeps a link to the original record.
-> Next.js + FastAPI + PostgreSQL, runnable with Docker Compose.
->
-> Menu, documentation and UI are in Brazilian Portuguese.
+> **Where does public money go?** An independent, non-partisan open-source platform to
+> search, understand and investigate Brazilian public spending: natural-language search,
+> procurement dashboards, price comparison across equivalent purchases, and a
+> deterministic audit engine that flags anomalies for **human review**, never as proof of
+> wrongdoing. Data comes from official public sources (PNCP, Comprasnet, TCE-SP) and keeps
+> a link to the original record. Next.js + FastAPI + PostgreSQL, runnable with Docker
+> Compose.
 
-**Para onde vai o dinheiro público?**
+> ⚠️ Rastro Público **is not an official government service**. All data comes from official
+> public sources and keeps the link to the original record.
 
-Plataforma independente, apartidária e de código aberto para **pesquisar, entender e
-investigar** os gastos públicos brasileiros. Combina busca em linguagem natural,
-dashboards de contratações, comparação de preços e um motor de auditoria determinístico
-que sinaliza possíveis anomalias para **verificação humana** — nunca como prova de
-irregularidade.
-
-> ⚠️ O Rastro Público **não é um serviço oficial do governo**. Todos os dados são
-> provenientes de fontes públicas oficiais e preservam o vínculo com o registro
-> original.
+> The product interface, data labels and the source documents are in Brazilian Portuguese,
+> because the data and the audience are Brazilian.
 
 ---
 
@@ -28,97 +20,96 @@ irregularidade.
 |:--|:--|
 | **Live demo** | [rastro-publico.vercel.app](https://rastro-publico.vercel.app) |
 | **Screenshots** | Pending — no screenshots yet |
+| **CI** | [![CI](https://github.com/FelipeFeerreira/rastro-publico/actions/workflows/ci.yml/badge.svg)](https://github.com/FelipeFeerreira/rastro-publico/actions/workflows/ci.yml) |
 | **Stack** | FastAPI · Python · Next.js · TypeScript · PostgreSQL · Docker Compose |
 | **License** | MIT — [LICENSE](LICENSE) |
 
-## Sumário
+## Contents
 
-- [Visão geral](#visão-geral)
-- [Arquitetura](#arquitetura)
+- [Overview](#overview)
+- [Architecture](#architecture)
 - [Stack](#stack)
-- [Início rápido com Docker](#início-rápido-com-docker)
-- [Desenvolvimento local](#desenvolvimento-local)
-- [Ingestão de dados reais](#ingestão-de-dados-reais)
-- [Testes](#testes)
-- [Estrutura do projeto](#estrutura-do-projeto)
-- [Princípios](#princípios)
-- [Documentação](#documentação)
+- [Quick start with Docker](#quick-start-with-docker)
+- [Local development](#local-development)
+- [Ingesting real data](#ingesting-real-data)
+- [Tests](#tests)
+- [Project structure](#project-structure)
+- [Principles](#principles)
+- [Documentation](#documentation)
 
 ---
 
-## Visão geral
+## Overview
 
-O Rastro Público oferece duas experiências integradas:
+Rastro Público offers two integrated experiences:
 
-1. **Busca simples** — qualquer cidadão pesquisa gastos, contratos, fornecedores, órgãos
-   e itens usando linguagem natural, com autocomplete, filtros e agrupamento de
-   resultados.
-2. **Investigação automatizada** — o sistema compara preços de contratações equivalentes,
-   detecta anomalias estatísticas de forma explicável e organiza evidências para
-   relatórios cidadãos.
+1. **Simple search** — any citizen can search spending, contracts, suppliers, agencies and
+   items in natural language, with autocomplete, filters and grouped results.
+2. **Automated investigation** — the system compares prices across equivalent purchases,
+   detects statistical anomalies in an explainable way and organises evidence for
+   citizen reports.
 
-A primeira integração real é o **Portal Nacional de Contratações Públicas (PNCP)**,
-cobrindo contratações sob a Lei 14.133/2021 de União, estados e municípios.
+The first real integration is the **National Public Procurement Portal (PNCP)**, covering
+procurement under Law 14.133/2021 at federal, state and municipal level.
 
-### Painel municipal
+### Municipal dashboard
 
-Há um painel de despesas municipais em `/municipios/3545209/despesas`
-(**Salto/SP**), com fonte TCE-SP: quanto a Prefeitura, a Câmara e o SAAE
-**realmente pagaram**, além de empenhado, liquidado e anulado (sempre separados,
-nunca somados entre si), com filtros por ano, mês, instituição, fornecedor e
-estágio. O **pago** é a métrica principal. Cobertura parcial é exibida
-explicitamente (ex.: 2026: jan–ago). Despesa municipal é mantida separada da
-despesa federal do IFSP Campus Salto.
+There is a municipal spending dashboard at `/municipios/3545209/despesas` (**Salto/SP**),
+sourced from TCE-SP: how much the City Hall, the City Council and SAAE **actually paid**,
+alongside committed, settled and cancelled amounts (always kept separate, never added
+together), with filters by year, month, institution, supplier and stage. **Paid** is the
+primary metric. Partial coverage is stated explicitly (e.g. 2026: Jan–Aug). Municipal
+spending is kept separate from the federal spending of IFSP Campus Salto.
 
-### Painel de campus
+### Campus dashboard
 
-Há um painel dedicado por unidade gestora (UASG) em `/campus/{uasg}` — por exemplo
-`/campus/158364` (**IFSP Campus Salto**). Ele reúne, em linguagem simples: o que foi
-contratado, fornecedores, período, valores e quanto foi **realmente pago**, com filtros
-por data, fornecedor e valor. Despesa **federal** (IFSP) é mantida separada da despesa
-**municipal** de Salto. Acessível pela página inicial e pelos resultados de busca.
+There is a dashboard per management unit (UASG) at `/campus/{uasg}` — for example
+`/campus/158364` (**IFSP Campus Salto**). In plain language it gathers what was contracted,
+suppliers, period, amounts and how much was **actually paid**, with filters by date,
+supplier and amount. **Federal** spending (IFSP) is kept separate from the **municipal**
+spending of Salto. Reachable from the home page and from search results.
 
-## Arquitetura
+## Architecture
 
-Monólito modular com fronteiras claras:
+A modular monolith with clear boundaries:
 
 ```
 frontend/  Next.js (App Router, TypeScript, Tailwind, shadcn/ui, Recharts)
 backend/   FastAPI + SQLAlchemy + Alembic + Pydantic
-  ├── connectors/   conectores de dados públicos (PNCP, ...)
-  ├── services/     ingestão, normalização, busca, análise, IA, relatórios
-  ├── models/       schema PostgreSQL normalizado
-  └── api/          endpoints REST versionados
-postgres/  banco relacional com full-text search
-redis/     cache de rate-limit e tarefas assíncronas (opcional)
+  ├── connectors/   public data connectors (PNCP, ...)
+  ├── services/     ingestion, normalisation, search, analysis, AI, reports
+  ├── models/       normalised PostgreSQL schema
+  └── api/          versioned REST endpoints
+postgres/  relational database with full-text search
+redis/     rate-limit cache and async tasks (optional)
 ```
 
-Detalhes em [`ARCHITECTURE.md`](./ARCHITECTURE.md).
+Details in [`ARCHITECTURE.md`](./ARCHITECTURE.md).
 
 ## Stack
 
-| Camada     | Tecnologia |
+| Layer      | Technology |
 |------------|------------|
 | Frontend   | Next.js 15 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Lucide, Recharts |
 | Backend    | Python 3.11+, FastAPI, SQLAlchemy 2.0, Alembic, Pydantic v2 |
-| Banco      | PostgreSQL 16 (full-text search com `portuguese`) |
-| Async      | Redis + Celery (opcional) |
+| Database   | PostgreSQL 16 (full-text search with `portuguese`) |
+| Async      | Redis + Celery (optional) |
 | Infra      | Docker, Docker Compose, GitHub Actions |
-| Testes     | pytest, respx, Vitest, Testing Library, Playwright |
+| Tests      | pytest, respx, Vitest, Testing Library, Playwright |
 
-## Início rápido com Docker
+## Quick start with Docker
 
 ```bash
 cp .env.example .env
-# edite .env se necessário (portas, segredos)
+# edit .env if needed (ports, secrets)
 docker compose up -d --build
 ```
 
 - Frontend: http://localhost:3000
 - API: http://localhost:8000/api/v1
-- Documentação da API (Swagger): http://localhost:8000/api/docs
+- API docs (Swagger): http://localhost:8000/api/docs
 
-Sincronize uma pequena amostra de dados reais do PNCP:
+Sync a small sample of real PNCP data:
 
 ```bash
 docker compose exec api python -m app.cli seed
@@ -127,7 +118,7 @@ docker compose exec api python -m app.cli ingest pncp \
   --modalidades 6 --max-paginas 1
 ```
 
-## Desenvolvimento local
+## Local development
 
 ### Backend
 
@@ -144,131 +135,132 @@ uvicorn app.main:app --reload
 
 ```bash
 cd frontend
-cp .env.example .env.local   # ajuste NEXT_PUBLIC_API_BASE_URL
+cp .env.example .env.local   # adjust NEXT_PUBLIC_API_BASE_URL
 npm install
 npm run dev
 ```
 
-## Ingestão de dados reais
+## Ingesting real data
 
-O conector do PNCP implementa paginação, rate limiting, retries com backoff
-exponencial e deduplicação por número de controle PNCP.
+The PNCP connector implements pagination, rate limiting, retries with exponential backoff
+and deduplication by PNCP control number.
 
 ```bash
-# Contratações por período e modalidade (códigos da Lei 14.133/2021)
+# Procurement by period and modality (Law 14.133/2021 codes)
 python -m app.cli ingest pncp --data-inicial 2026-01-01 --data-final 2026-01-31 \
   --uf SP --modalidades 6,5 --max-paginas 5
 
-# Incluir itens e resultados homologados (mais lento na fonte)
+# Include items and approved results (slower at the source)
 python -m app.cli ingest pncp --data-inicial 2026-01-05 --data-final 2026-01-05 \
   --com-itens --max-paginas 1
 
-# Contratos (PNCP)
+# Contracts (PNCP)
 python -m app.cli contracts --data-inicial 2026-01-01 --data-final 2026-01-31
 
-# Contratos federais do Comprasnet por unidade gestora (UASG)
-# Ex.: IFSP Campus Salto — UASG 158364, Salto/SP (IBGE 3545209)
+# Federal Comprasnet contracts per management unit (UASG)
+# E.g. IFSP Campus Salto — UASG 158364, Salto/SP (IBGE 3545209)
 python -m app.cli comprasnet --uasg 158364 \
   --municipio 3545209 --nome-municipio Salto --uf SP
 
-# Execução financeira (empenhado/liquidado/pago) dos contratos de uma UASG
+# Financial execution (committed/settled/paid) of a UASG's contracts
 python -m app.cli comprasnet-pagamentos --uasg 158364
 
-# Despesas municipais (eventos) do TCE-SP — ex.: Salto/SP
+# Municipal spending (events) from TCE-SP — e.g. Salto/SP
 python -m app.cli tce-sp-despesas --municipio salto --ibge 3545209 --uf SP \
   --nome-municipio Salto --ano 2025 --mes-inicio 1 --mes-fim 12
 
-# Enriquecimento: histórico, função/atividade e link do detalhe oficial
-# (CSV do conjunto de dados do TCE-SP; correspondência 1:1, idempotente)
+# Enrichment: history, function/activity and official detail link
+# (TCE-SP dataset CSV; 1:1 matching, idempotent)
 python -m app.cli tce-sp-detalhes --municipio salto --ibge 3545209 --ano 2025 --max 100
 
-# Remuneração de servidores federais (exige TRANSPARENCIA_API_KEY)
+# Federal civil-servant pay (requires TRANSPARENCIA_API_KEY)
 python -m app.cli transparencia-servidores --orgao 26439 --mes 202501 \
   --campus "IFSP - CAMPUS SALTO"
 
-# Executar motor de auditoria
+# Run the audit engine
 python -m app.cli audit --limit 200
 ```
 
-> **Pagamentos:** os estágios são mantidos separados — “empenhado” reserva,
-> “liquidado” confere e “pago” efetiva. Valor contratado nunca é exibido como pago.
-> **Salários:** só são exibidos quando publicados oficialmente; sem a credencial do
-> Portal da Transparência, a plataforma informa explicitamente a indisponibilidade.
+> **Payments:** the stages stay separate — "empenhado" commits, "liquidado" verifies and
+> "pago" settles. A contracted amount is never displayed as paid.
+> **Salaries:** shown only when officially published; without the Transparency Portal
+> credential the platform states the unavailability explicitly.
 
-> A importação do Comprasnet é idempotente (reimportar atualiza, não duplica) e
-> valida a UASG de cada registro, evitando atribuir contratos de outros campi.
+> The Comprasnet import is idempotent (re-importing updates, never duplicates) and
+> validates each record's UASG, so contracts from other campuses are never misattributed.
 
-> A coleta é **incremental**: registros já existentes são atualizados, não duplicados.
-> Cada execução gera um `collection_run` com contadores e log de erros.
+> Collection is **incremental**: existing records are updated, not duplicated. Each run
+> produces a `collection_run` with counters and an error log.
 
-## Testes
+## Tests
 
 ```bash
 # Backend
-cd backend && python -m pytest -q        # 37 testes
+cd backend && python -m pytest -q        # 37 tests
 ruff check app tests
 
 # Frontend
 cd frontend && npm run test              # Vitest
 npm run typecheck && npm run lint
-npm run test:e2e                         # Playwright (requer a stack no ar)
+npm run test:e2e                         # Playwright (requires the stack running)
 ```
 
-## Estrutura do projeto
+## Project structure
 
 ```
 politica/
-├── ARCHITECTURE.md          # decisões arquiteturais e modelo de dados
-├── ROADMAP.md               # marcos e status
+├── ARCHITECTURE.md          # architecture decisions and data model
+├── ROADMAP.md               # milestones and status
 ├── docker-compose.yml
 ├── .env.example
 ├── backend/
 │   ├── app/
-│   │   ├── core/            # config, logging, segurança, rate limit
-│   │   ├── db/              # engine, sessão, base declarativa
-│   │   ├── models/          # 26 tabelas normalizadas
-│   │   ├── schemas/         # contratos Pydantic
-│   │   ├── connectors/      # PNCP e infraestrutura de conectores
-│   │   ├── services/        # ingestão, normalização, busca, análise, IA
-│   │   ├── api/v1/          # endpoints REST
+│   │   ├── core/            # config, logging, security, rate limit
+│   │   ├── db/              # engine, session, declarative base
+│   │   ├── models/          # 26 normalised tables
+│   │   ├── schemas/         # Pydantic contracts
+│   │   ├── connectors/      # PNCP and connector infrastructure
+│   │   ├── services/        # ingestion, normalisation, search, analysis, AI
+│   │   ├── api/v1/          # REST endpoints
 │   │   ├── cli.py           # seed, ingest, audit, stats
 │   │   └── main.py
-│   ├── alembic/             # migrações
+│   ├── alembic/             # migrations
 │   └── tests/               # pytest
 └── frontend/
     └── src/
-        ├── app/             # rotas (App Router)
-        ├── components/      # UI, layout, busca, gráficos, investigação
-        └── lib/             # api, tipos, formatação
+        ├── app/             # routes (App Router)
+        ├── components/      # UI, layout, search, charts, investigation
+        └── lib/             # api, types, formatting
 ```
 
-## Princípios
+## Principles
 
-1. **Nunca inventar dados.** Valores de produção vêm exclusivamente de fontes oficiais.
-2. **Rastreabilidade total.** Todo número aponta para o registro e a fonte originais.
-3. **Estágios financeiros distintos.** Estimado ≠ homologado ≠ empenhado ≠ pago.
-4. **Anomalia não é acusação.** A plataforma sinaliza; quem conclui são os órgãos
-   competentes e o cidadão.
-5. **A IA não calcula valores.** Cálculo é determinístico; a IA explica e organiza.
-6. **Neutralidade política.** Nenhum ranking de corrupção ou veredito automático.
+1. **Never invent data.** Production figures come exclusively from official sources.
+2. **Full traceability.** Every number points back to the original record and source.
+3. **Distinct financial stages.** Estimated ≠ approved ≠ committed ≠ paid.
+4. **An anomaly is not an accusation.** The platform flags; the conclusion belongs to the
+   competent authorities and to the citizen.
+5. **The AI does not compute values.** Calculation is deterministic; the AI explains and
+   organises.
+6. **Political neutrality.** No corruption ranking and no automatic verdict.
 
-## Documentação
+## Documentation
 
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — arquitetura, modelo de dados e conector PNCP
-- [`ROADMAP.md`](./ROADMAP.md) — marcos e checklist
-- [`docs/API.md`](./docs/API.md) — referência da API
-- [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) — implantação e operação
-- [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md) — fontes e requisitos
+- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — architecture, data model and the PNCP connector
+- [`ROADMAP.md`](./ROADMAP.md) — milestones and checklist
+- [`docs/API.md`](./docs/API.md) — API reference
+- [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md) — deployment and operation
+- [`docs/DATA_SOURCES.md`](./docs/DATA_SOURCES.md) — sources and requirements
 
-## O que eu faria a seguir
+## What I would do next
 
-- Adicionar CI no GitHub Actions rodando a suíte de backend e o build do frontend, com badge no README.
-- Ampliar os conectores de ingestão e documentar a cobertura por fonte no ROADMAP.
-- Capturar telas do painel municipal e do motor de auditoria para o topo do README.
+- Expand the ingestion connectors and document coverage per source in the ROADMAP.
+- Capture the municipal dashboard and the audit engine screens for the top of this README.
+- Add an end-to-end test that ingests a known fixture and asserts the reported totals.
 
-## Licença e uso responsável
+## Licence and responsible use
 
-Código sob licença MIT — ver [LICENSE](LICENSE).
+Code under the MIT licence — see [LICENSE](LICENSE).
 
-Plataforma de interesse público. Ao reutilizar os dados, cite a fonte oficial e o
-Rastro Público. Não apresente achados automáticos como prova de irregularidade.
+A public-interest platform. When reusing the data, cite the official source and Rastro
+Público. Do not present automated findings as proof of wrongdoing.
