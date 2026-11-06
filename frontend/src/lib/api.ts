@@ -57,7 +57,13 @@ async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T>
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
-      ...(next ? { next } : { cache: rest.method && rest.method !== "GET" ? "no-store" : "no-store" }),
+      // Reads are cached for 60s so the page does not sit waiting on the Python API
+      // on every visit; writes and authenticated reads always go to the network.
+      ...(next
+        ? { next }
+        : token || (rest.method && rest.method !== "GET")
+          ? { cache: "no-store" as RequestCache }
+          : { next: { revalidate: 60 } }),
     });
   } catch {
     throw new ApiError(
