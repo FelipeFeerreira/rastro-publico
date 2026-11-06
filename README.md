@@ -19,10 +19,23 @@
 | | |
 |:--|:--|
 | **Live demo** | [rastro-publico.vercel.app](https://rastro-publico.vercel.app) |
-| **Screenshots** | Pending — no screenshots yet |
+| **Screenshots** | [`docs/screenshots`](docs/screenshots) — home, spending dashboard, published records table |
 | **CI** | [![CI](https://github.com/FelipeFeerreira/rastro-publico/actions/workflows/ci.yml/badge.svg)](https://github.com/FelipeFeerreira/rastro-publico/actions/workflows/ci.yml) |
 | **Stack** | FastAPI · Python · Next.js · TypeScript · PostgreSQL · Docker Compose |
 | **License** | MIT — [LICENSE](LICENSE) |
+
+## Screenshots
+
+Real captures of the deployed app (November 6, 2026), Brazilian Portuguese interface because the data and the audience are Brazilian.
+
+| Home | Spending dashboard |
+| --- | --- |
+| ![Home](docs/screenshots/home.png) | ![Spending dashboard](docs/screenshots/gastos.png) |
+
+![Published records table](docs/screenshots/gastos-tabela.png)
+
+**Known performance issue:** the home page takes ~7.2 s to first byte (measured 7.21 s, 7.23 s, 7.40 s and 7.48 s on four consecutive requests; a static asset on the same deployment answers in 0.34 s). Every request comes back `x-vercel-cache: MISS` with `cache-control: private, no-store`, so the page is rendered on each visit and the render waits on the Python API — not a cold start, since the fourth request is as slow as the first.
+
 
 ## Contents
 
